@@ -1,0 +1,8 @@
+/assets/roms/*
+!/assets/roms/.gitkeep
+
+node_modules
+dist
+docs
+
+.DS_Store
