@@ -120,19 +120,7 @@ export class Game {
     Prim.drawSolidRectangle(this.screen, 0, 0, 8, 224, Color.Black);
     Prim.drawSolidRectangle(this.screen, 248, 0, 8, 224, Color.Black);
 
-    if (this.mapEngine.paletteSet) {
-      // Prim.blit(this.screen, 0, 0, this.mapEngine.paletteSet.getTexture());
-    }
-
-    // this.mapEngine.combinedGraphicset?.debugDraw(this.screen, this.mapEngine.palette!, 8, 8);
-
     this.screenShape.draw(Surface.Screen, this.screenTransform);
-
-    // this.variableWidthFont.drawCharacter(Surface.Screen, 2, 2, 0x22);
-    // Prim.blit(Surface.Screen, 20, 20, this.variableWidthFont.surface);
-    // for (const [i, char] of this.variableWidthFont.characters) {
-    //   Prim.drawRectangle(Surface.Screen, 20 + char.x, 20 + char.y, char.width, 11, 1, Color.Magenta);
-    // }
   }
 
   update() {
@@ -177,7 +165,10 @@ export class Game {
       case Intent.Down:
       case Intent.Left:
       case Intent.Right:
-        this.mapEngine.acceptInput(input);
+        if (this.scriptEngine.currentScript?.isFinished()) {
+          this.mapEngine.acceptInput(input);
+        }
+
         break;
     }
   }
