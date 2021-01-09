@@ -16,3 +16,7 @@ npm run build
 ```
 npm run start
 ```
+
+## Controls
+
+W/A/S/D to move, J to accept
