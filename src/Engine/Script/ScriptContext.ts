@@ -64,13 +64,13 @@ export class ScriptContext<
     );
   }
 
-  stepUntilWaiting(game: Game) {
+  stepUntilWaiting() {
     do {
-      this.step(game);
+      this.step();
     } while (this.isReady());
   }
 
-  step(game: Game) {
+  step() {
     if (!this.isReady()) {
       return;
     }

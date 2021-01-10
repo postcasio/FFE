@@ -73,7 +73,7 @@ export class MapProperties {
       shiftX: signed8(this.data[0x14]),
       shiftY: signed8(this.data[0x15]),
       animatedTilesetIndex: (this.data[0x1b] & 0xe0) >> 5,
-      graphicset: this.data[0x0b] & 0x3 || this.data[0x0a] & (0xf0 << 2),
+      graphicset: (this.view.getUint16(0x0a, true) & 0x03f0) >> 4,
       priority: (this.data[0x02] & 0x80) !== 0,
     };
   }
@@ -88,5 +88,9 @@ export class MapProperties {
 
   get paletteAnimationIndex() {
     return this.data[0x1a];
+  }
+
+  get colorMathIndex() {
+    return this.data[0x20];
   }
 }

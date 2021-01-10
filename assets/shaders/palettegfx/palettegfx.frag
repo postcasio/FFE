@@ -22,7 +22,7 @@ varying vec2 varying_texcoord;
 void main() {
 	vec2 texcoord = varying_texcoord;
 
-	if (wavy_effect && !wavy_effect_battle) {
+	if (wavy_effect) {
 
 		float amplitudey = sin(t + varying_texcoord.y * tex_size.y / 2.0);
 

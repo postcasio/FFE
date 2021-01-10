@@ -17,9 +17,33 @@ export class Fader {
   callbacksOnDidFinish: Array<() => void> = [];
 
   surface: Surface;
+  shape: Shape;
+  model!: Model;
 
   constructor(surface: Surface) {
     this.surface = surface;
+    const w = 256;
+    const h = 224;
+    this.shape = new Shape(
+      ShapeType.TriStrip,
+      null,
+      new VertexList([
+        { x: 0, y: 0, u: 0, v: 1 },
+        { x: w, y: 0, u: 1, v: 1 },
+        { x: 0, y: h, u: 0, v: 0 },
+        { x: w, y: h, u: 1, v: 0 },
+      ])
+    );
+  }
+
+  async initialize() {
+    this.model = new Model(
+      [this.shape],
+      await Shader.fromFiles({
+        fragmentFile: "@/assets/shaders/fader/fader.frag",
+        vertexFile: "@/assets/shaders/fader/fader.vert",
+      })
+    );
   }
 
   fade(direction: FadingDirection, speed: number) {
@@ -58,14 +82,19 @@ export class Fader {
   }
 
   render() {
-    Prim.drawSolidRectangle(
-      this.surface,
-      0,
-      0,
-      this.surface.width,
-      this.surface.height,
-      this.color
-    );
+    if (!this.model || !this.model.shader) {
+      return;
+    }
+    this.model.shader.setColorVector("mask", this.color);
+    this.model.draw(this.surface);
+    // Prim.drawSolidRectangle(
+    //   this.surface,
+    //   0,
+    //   0,
+    //   this.surface.width,
+    //   this.surface.height,
+    //   this.color
+    // );
   }
 
   onDidFinish(callback: () => void) {

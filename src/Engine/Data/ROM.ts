@@ -2,6 +2,7 @@ import { hex } from "../utils";
 import { decodeLZSS } from "./LZSS";
 import {
   hirom,
+  ROM_COLOR_MATH_SIZE,
   ROM_MAP_CHARACTER_PALETTE_SIZE,
   ROM_MAP_PALETTE_ANIMATION_SIZE,
   ROM_MAP_PALETTE_SIZE,
@@ -16,6 +17,7 @@ import {
   ROM_OFFSET_BG3_GRAPHICS,
   ROM_OFFSET_BG3_GRAPHIC_POINTER_LIST,
   ROM_OFFSET_CHARACTER_PALETTES,
+  ROM_OFFSET_COLOR_MATH,
   ROM_OFFSET_FIELD_SPRITES_GRAPHICS,
   ROM_OFFSET_HEADER,
   ROM_OFFSET_LOCATION_LIST,
@@ -63,8 +65,12 @@ export class Slice {
     this.compressedLength = compressedLength;
   }
 
-  slice(start: number, end?: number) {
+  getArraySlice(start: number, end?: number) {
     return this.data.slice(start, end);
+  }
+
+  slice(start: number, end?: number) {
+    return new Slice(this.offset + start, this.data.slice(start, end));
   }
 }
 
@@ -233,13 +239,14 @@ export class ROM {
   }
 
   getLayer3GraphicsSlice(index: number) {
-    const tilesetPointerOffset =
+    const graphicsPointerOffset =
       ROM_OFFSET_BG3_GRAPHIC_POINTER_LIST + index * 3;
-    const tilesetPointer = this.getUint24(tilesetPointerOffset);
-    const tilesetOffset = tilesetPointer + ROM_OFFSET_BG3_GRAPHICS;
-    const compressedLength = this.getUint16(tilesetOffset);
+    const graphicsPointer = this.getUint24(graphicsPointerOffset);
+    const graphicsOffset = ROM_OFFSET_BG3_GRAPHICS + graphicsPointer;
+
+    const compressedLength = this.getUint16(graphicsOffset);
     const decoded = decodeLZSS(
-      this.getArraySlice(tilesetOffset, tilesetOffset + compressedLength)
+      this.getArraySlice(graphicsOffset, graphicsOffset + compressedLength)
     );
 
     if (decoded.compressedLength !== compressedLength) {
@@ -248,7 +255,7 @@ export class ROM {
       );
     }
 
-    return new Slice(tilesetOffset, decoded.data, compressedLength);
+    return new Slice(graphicsOffset, decoded.data, compressedLength);
   }
 
   getMapPaletteAnimationSlice(index: number) {
@@ -370,6 +377,14 @@ export class ROM {
     return new Slice(
       tilesetOffset,
       this.getArraySlice(tilesetOffset, tilesetOffset + 10 * 16)
+    );
+  }
+
+  getColorMathSlice(index: number) {
+    const offset = ROM_OFFSET_COLOR_MATH + index * ROM_COLOR_MATH_SIZE;
+    return new Slice(
+      offset,
+      this.getArraySlice(offset, offset + ROM_COLOR_MATH_SIZE)
     );
   }
 

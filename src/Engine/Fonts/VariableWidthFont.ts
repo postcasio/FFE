@@ -1,18 +1,21 @@
 import { Slice } from "../Data/ROM";
 import { Graphics } from "../Graphics/Graphics";
 import { Palette } from "../Graphics/Palette";
+import { PaletteSet } from "../Graphics/PaletteSet";
 
 export class VariableWidthFont {
   graphics: Graphics;
   characterWidths: number[];
-  palette: Palette;
+  paletteSet: PaletteSet;
   mask?: Color;
 
   constructor(graphics: Graphics, characterWidths: Slice) {
     this.graphics = graphics;
     this.characterWidths = Array.from(characterWidths.data);
 
-    this.palette = new Palette([new Color(0, 0, 0, 0), new Color(1, 1, 1)]);
+    this.paletteSet = new PaletteSet([
+      [new Color(0, 0, 0, 0), new Color(1, 1, 1)],
+    ]);
   }
 
   static async create(graphics: Graphics, characterWidths: Slice) {
@@ -46,10 +49,11 @@ export class VariableWidthFont {
       character - 0x20,
       x + 1,
       y + 1,
-      this.palette
+      this.paletteSet,
+      0
     );
     this.mask = mask;
-    this.graphics.drawTile(surface, character - 0x20, x, y, this.palette);
+    this.graphics.drawTile(surface, character - 0x20, x, y, this.paletteSet, 0);
   }
 
   getCharacterWidth(character: number) {

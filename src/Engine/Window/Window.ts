@@ -43,7 +43,8 @@ export class Window {
       index + this.style * 28,
       x,
       y,
-      this.paletteSet.palettes[this.style]
+      this.paletteSet,
+      this.style * this.paletteSet.colorsPerPalette
     );
   }
 

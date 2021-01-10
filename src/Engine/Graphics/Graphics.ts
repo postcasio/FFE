@@ -2,12 +2,15 @@ import { ByteSwap } from "@/src/Engine/Data/ByteSwap";
 import { Linear1bpp } from "@/src/Engine/Data/Linear1bpp";
 import { Snes4bpp } from "@/src/Engine/Data/Snes4bpp";
 import { Slice } from "../Data/ROM";
+import { Snes2bpp } from "../Data/Snes2bpp";
 import { hex } from "../utils";
 import { Palette } from "./Palette";
+import { PaletteSet } from "./PaletteSet";
 
 export enum GraphicsFormat {
   ByteSwappedLinear1bpp,
   Snes4bpp,
+  Snes2bpp,
 }
 
 export enum GraphicsAtlasType {
@@ -20,6 +23,48 @@ export interface TileRenderingObjects {
   shape: Shape;
 }
 
+export interface AtlasCollectionElement {
+  atlas: Atlas;
+  paletteSet: PaletteSet;
+  indexInPaletteSet: number;
+}
+export class AtlasCollection {
+  atlases: AtlasCollectionElement[] = [];
+
+  has(paletteSet: PaletteSet, indexInPaletteSet: number) {
+    for (const element of this.atlases) {
+      if (
+        element.paletteSet === paletteSet &&
+        element.indexInPaletteSet === indexInPaletteSet
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  get(paletteSet: PaletteSet, indexInPaletteSet: number) {
+    for (const element of this.atlases) {
+      if (
+        element.paletteSet === paletteSet &&
+        element.indexInPaletteSet === indexInPaletteSet
+      ) {
+        return element.atlas;
+      }
+    }
+
+    return undefined;
+  }
+
+  set(paletteSet: PaletteSet, indexInPaletteSet: number, atlas: Atlas) {
+    this.atlases.push({
+      atlas,
+      paletteSet,
+      indexInPaletteSet,
+    });
+  }
+}
 export class Atlas {
   surface: Surface;
   buffer: Uint8Array;
@@ -47,7 +92,7 @@ export class Graphics {
   type: GraphicsFormat;
   data: Uint8Array;
 
-  atlases: Map<Palette, Atlas> = new Map();
+  atlases: AtlasCollection = new AtlasCollection();
   atlasWidthInTiles: number;
   atlasHeightInTiles: number;
   tileWidth = 8;
@@ -90,6 +135,9 @@ export class Graphics {
       case GraphicsFormat.ByteSwappedLinear1bpp:
         this.data = this.decodeByteSwappedLinear1bpp(slice.data);
         break;
+      case GraphicsFormat.Snes2bpp:
+        this.data = this.decodeSnes2bpp(slice.data);
+        break;
       default:
         throw "not supported format";
     }
@@ -108,11 +156,18 @@ export class Graphics {
     return Snes4bpp.decode(data);
   }
 
+  decodeSnes2bpp(data: Uint8Array): Uint8Array {
+    return Snes2bpp.decode(data);
+  }
+
   decodeByteSwappedLinear1bpp(data: Uint8Array): Uint8Array {
     return ByteSwap.decode(Linear1bpp.decode(data), 16);
   }
 
-  renderAtlasWithPalette(palette: Palette): Atlas {
+  renderAtlasWithPalette(
+    paletteSet: PaletteSet,
+    indexInPaletteSet: number
+  ): Atlas {
     const buffer = new Uint8Array(this.atlasWidth * this.atlasHeight * 4);
 
     for (let y = 0; y < this.atlasHeightInTiles; y++) {
@@ -124,7 +179,8 @@ export class Graphics {
           index,
           x * this.tileWidth,
           y * this.tileHeight,
-          palette
+          paletteSet,
+          indexInPaletteSet
         );
       }
     }
@@ -141,14 +197,14 @@ export class Graphics {
     return atlas;
   }
 
-  getAtlas(palette: Palette): Atlas {
-    if (this.atlases.has(palette)) {
-      return this.atlases.get(palette)!;
+  getAtlas(paletteSet: PaletteSet, indexInPaletteSet: number): Atlas {
+    if (this.atlases.has(paletteSet, indexInPaletteSet)) {
+      return this.atlases.get(paletteSet, indexInPaletteSet)!;
     }
 
-    const atlas = this.renderAtlasWithPalette(palette);
+    const atlas = this.renderAtlasWithPalette(paletteSet, indexInPaletteSet);
 
-    this.atlases.set(palette, atlas);
+    this.atlases.set(paletteSet, indexInPaletteSet, atlas);
 
     return atlas;
   }
@@ -196,11 +252,12 @@ export class Graphics {
     index: number,
     x: number,
     y: number,
-    palette: Palette,
+    paletteSet: PaletteSet,
+    indexInPaletteSet: number,
     mirrored = false,
     inverted = false
   ) {
-    const atlas = this.getAtlas(palette);
+    const atlas = this.getAtlas(paletteSet, indexInPaletteSet);
 
     const rendering = this.getTileRenderingObjects(index);
 
@@ -233,7 +290,8 @@ export class Graphics {
     index: number,
     x: number,
     y: number,
-    palette: Palette
+    paletteSet: PaletteSet,
+    indexInPaletteSet: number
   ) {
     const tileStart = index * this.tileSize;
 
@@ -245,13 +303,15 @@ export class Graphics {
 
         const value = this.data[tileStart + py * this.tileWidth + px];
 
-        const color = value === 0 ? Color.Transparent : palette.colors[value];
+        const color =
+          value === 0
+            ? Color.Transparent
+            : paletteSet.getColor(indexInPaletteSet + value);
+
+        const colorIndex =
+          (indexInPaletteSet + value) % paletteSet.colorsPerPalette;
 
         const pixel = (x + px + (y + py) * this.atlasWidth) * 4;
-
-        if (!palette.colors[value]) {
-          throw `${value} does not exist in palette of size ${palette.colors.length}`;
-        }
 
         switch (this.atlasType) {
           case GraphicsAtlasType.RGBA:
@@ -261,10 +321,13 @@ export class Graphics {
             buffer[pixel + 3] = color.a * 255;
             break;
           case GraphicsAtlasType.Palette:
-            buffer[pixel] = (255 / palette.colors.length) * (value + 0.5);
+            buffer[pixel] =
+              (255 / paletteSet.colorsPerPalette) * (colorIndex + 0.5);
             buffer[pixel + 1] =
-              (255 / (palette.set?.palettes.length || 8)) *
-              (palette.indexInSet + 0.5);
+              (255 / (paletteSet.palettes.length || 8)) *
+              (paletteSet.getPaletteForColorIndex(indexInPaletteSet + value)
+                .indexInSet +
+                0.5);
             buffer[pixel + 2] = 0;
             buffer[pixel + 3] = value === 0 ? 0 : 255;
         }

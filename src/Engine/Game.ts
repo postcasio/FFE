@@ -108,17 +108,22 @@ export class Game {
     this.messageBox = new MessageBox(this, this.screen);
 
     await this.mapEngine.initialize();
+
+    await this.fader.initialize();
   }
 
   render() {
     this.screen.clear(Color.Black);
-    this.mapEngine.draw(this.screen);
+    this.mapEngine.composite(this.screen);
     this.messageBox.render();
     this.fader.render();
     Prim.drawSolidRectangle(this.screen, 0, 0, 256, 8, Color.Black);
     Prim.drawSolidRectangle(this.screen, 0, 216, 256, 8, Color.Black);
     Prim.drawSolidRectangle(this.screen, 0, 0, 8, 224, Color.Black);
     Prim.drawSolidRectangle(this.screen, 248, 0, 8, 224, Color.Black);
+    if (this.mapEngine.paletteSet) {
+      Prim.blit(this.screen, 0, 0, this.mapEngine.paletteSet.getTexture());
+    }
 
     this.screenShape.draw(Surface.Screen, this.screenTransform);
   }

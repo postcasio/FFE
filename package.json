@@ -10,7 +10,9 @@
   "scripts": {
     "build": "cell build",
     "watch": "tsc --watch",
-    "start": "spherun dist"
+    "start": "spherun dist",
+    "lint": "eslint src",
+    "fix": "eslint --fix src"
   },
   "author": "",
   "license": "ISC",

@@ -4,9 +4,33 @@ import { BG1Tileset } from "./BG1Tileset";
 import { Layer, LayerType } from "./Layer";
 import { Tileset } from "./Tileset";
 
+export enum ZLevel {
+  bottom = 0, // force to bottom
+  snesBk = 0, // snes back area
+  snes4L = 2, // snes layer 4, low priority
+  snes3L = 3, // snes layer 3, low priority
+  snesS0 = 4, // snes sprites, priority 0
+  snes4H = 6, // snes layer 4, high priority
+  snes3H = 7, // snes layer 3, high priority
+  snesS1 = 8, // snes sprites, priority 1
+  snes2L = 10, // snes layer 2, low priority
+  snes1L = 11, // snes layer 1, low priority
+  snesS2 = 12, // snes sprites, priority 2
+  snes2H = 14, // snes layer 2, high priority
+  snes1H = 15, // snes layer 1, high priority
+  snesS3 = 16, // snes sprites, priority 3
+  snes3P = 17, // snes layer 3, highest priority
+  top = 100, // force to top
+}
 export class BG12Layer implements Layer {
   type = LayerType.BG12;
 
+  subscreen = false;
+  mainscreen = false;
+
+  math = false;
+
+  zLevels: [ZLevel, ZLevel] = [ZLevel.bottom, ZLevel.bottom];
   tiles: number[] = [];
   tileWidth = 16;
   tileHeight = 16;
@@ -38,6 +62,8 @@ export class BG12Layer implements Layer {
   paletteShader!: Shader;
 
   wavyEffect = false;
+
+  layer3Priority = false;
 
   makeShapes() {
     const w = this.lowSurface.width;
@@ -73,7 +99,16 @@ export class BG12Layer implements Layer {
   }
 
   render(force = false) {
-    if ((!this.dirty && !force) || !this.tileset) {
+    if (!this.dirty && !force) {
+      return;
+    }
+
+    if (this.tiles.length === 0 || !this.tileset) {
+      this.lowSurface.clear(Color.Transparent);
+      this.highSurface.clear(Color.Transparent);
+
+      this.dirty = false;
+
       return;
     }
 
@@ -105,7 +140,7 @@ export class BG12Layer implements Layer {
         const pixelY = tileY * this.tileHeight;
 
         this.tileset.drawTile(
-          this.lowSurface,
+          this.layer3Priority ? this.highSurface : this.lowSurface,
           this.highSurface,
           tile,
           pixelX,
@@ -129,6 +164,10 @@ export class BG12Layer implements Layer {
     cameraX: number,
     cameraY: number
   ) {
+    if (!this.tiles.length) {
+      return;
+    }
+
     const xOffset =
       cameraX / this.parallaxMultiplierX + this.shiftX * 16 - w / 2 + 8;
     const yOffset =

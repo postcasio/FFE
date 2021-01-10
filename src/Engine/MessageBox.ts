@@ -69,7 +69,7 @@ export class MessageBox {
 
   update() {
     if (this.state === State.Writing) {
-      this.dialogScriptContext?.stepUntilWaiting(this.game);
+      this.dialogScriptContext?.stepUntilWaiting();
     }
 
     if (this.isOpen()) {

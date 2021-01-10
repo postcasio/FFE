@@ -2,6 +2,7 @@ import { ROM, Slice } from "@/src/Engine/Data/ROM";
 import Prim from "prim";
 import { Graphics } from "../Graphics/Graphics";
 import { Palette } from "../Graphics/Palette";
+import { PaletteSet } from "../Graphics/PaletteSet";
 import { Tileset } from "./Tileset";
 
 export interface AnimatedTile {
@@ -41,7 +42,8 @@ export class AnimatedTileset {
     index: number,
     x: number,
     y: number,
-    palette: Palette,
+    paletteSet: PaletteSet,
+    indexInPaletteSet: number,
     mirrored = false,
     inverted = false
   ) {
@@ -60,7 +62,8 @@ export class AnimatedTileset {
       frameIndex,
       x,
       y,
-      palette,
+      paletteSet,
+      indexInPaletteSet,
       mirrored,
       inverted
     );

@@ -102,7 +102,8 @@ export class BG1Tileset implements Tileset {
           index - 640,
           x + (i === 1 || i === 3 ? 8 : 0),
           y + (i === 2 || i === 3 ? 8 : 0),
-          this.paletteSet.palettes[subtile.palette],
+          this.paletteSet,
+          subtile.palette * this.paletteSet.colorsPerPalette,
           subtile.mirrored,
           subtile.inverted
         );
@@ -112,7 +113,8 @@ export class BG1Tileset implements Tileset {
           index,
           x + (i === 1 || i === 3 ? 8 : 0),
           y + (i === 2 || i === 3 ? 8 : 0),
-          this.paletteSet.palettes[subtile.palette],
+          this.paletteSet,
+          subtile.palette * this.paletteSet.colorsPerPalette,
           subtile.mirrored,
           subtile.inverted
         );

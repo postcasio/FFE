@@ -5,36 +5,34 @@
  * and packaging games.
  */
 
-import { tsc } from 'cell-runtime';
+import { tsc } from "cell-runtime";
 
 // describe the game we're building.  everything in Sphere.Game gets written to
 // the game manifest (game.json) at the end of the build.
 
-Object.assign(Sphere.Game,
-{
-	// target the Sphere v2 API.
-	version: 2,
+Object.assign(Sphere.Game, {
+  // target the Sphere v2 API.
+  version: 2,
 
-	// the lowest API level your code requires.  if a game's targeted API level
-	// isn't supported by the version of the engine used to run it, an error
-	// message will be displayed to let the user know they need to upgrade.
-	apiLevel: 1,
+  // the lowest API level your code requires.  if a game's targeted API level
+  // isn't supported by the version of the engine used to run it, an error
+  // message will be displayed to let the user know they need to upgrade.
+  apiLevel: 1,
 
-	name: "ffe",
-	author: "casiotone",
-	summary: "",
-	resolution: '1024x768',
+  name: "ffe",
+  author: "casiotone",
+  summary: "",
+  resolution: "1280x1024",
 
-	saveID: 'ffe',
+  saveID: "ffe",
 
-	// the SphereFS path of the JavaScript module used to bootstrap the game.
-	// if the main module has a callable default export, that export will be
-	// called automatically.  if the default export is a class, the class will
-	// be instantiated using `new` and `.start()` will be called on the
-	// resulting object.
-	main: '@/src/main.js',
+  // the SphereFS path of the JavaScript module used to bootstrap the game.
+  // if the main module has a callable default export, that export will be
+  // called automatically.  if the default export is a class, the class will
+  // be instantiated using `new` and `.start()` will be called on the
+  // resulting object.
+  main: "@/src/main.js",
 });
-
 
 // this tells Cell which files to copy from the source tree when packaging the
 // game.  see the Cell API documentation for more information.  in general:
@@ -46,6 +44,6 @@ Object.assign(Sphere.Game,
 //       `path/to/file`, is relative to the location of the Cellscript, not the
 //       game's JSON manifest like in Sphere.
 
-install('@/assets', files('assets/*', true));
+install("@/assets", files("assets/*", true));
 
-tsc('@/', 'tsconfig.json');
+tsc("@/", "tsconfig.json");

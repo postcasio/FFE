@@ -13,7 +13,7 @@ export class ScriptEngine {
 
   step() {
     try {
-      this.currentScript?.stepUntilWaiting(this.game);
+      this.currentScript?.stepUntilWaiting();
     } catch (e) {
       SSj.log("Script engine failed");
       SSj.log(e.toString());

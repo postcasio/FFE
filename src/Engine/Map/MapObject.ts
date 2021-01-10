@@ -12,6 +12,7 @@ import { Graphics, GraphicsFormat } from "../Graphics/Graphics";
 import { SpriteTileLayout } from "./SpriteTileLayout";
 import { Game } from "../Game";
 import { hex } from "../utils";
+import { PaletteSet } from "../Graphics/PaletteSet";
 
 const objectStateColors = {
   [ScriptContextState.Executing]: Color.Green,
@@ -64,7 +65,7 @@ export class MapObject {
   paletteIndex = 0;
   graphics?: Graphics;
   surface?: Surface;
-  palette?: Palette;
+  paletteSet?: PaletteSet;
   eventBit = 0;
   exists = false;
   speed: Speed = Speed.Normal;
@@ -107,8 +108,9 @@ export class MapObject {
 
   loadPalette(palette: number) {
     this.paletteIndex = palette;
-    this.palette = new Palette(
-      Game.current.rom.getCharacterPaletteSlice(palette)
+    this.paletteSet = new PaletteSet(
+      Game.current.rom.getCharacterPaletteSlice(palette),
+      16
     );
   }
 
@@ -160,7 +162,7 @@ export class MapObject {
   }
 
   render() {
-    if (!this.graphics || !this.activeTileLayout || !this.palette) {
+    if (!this.graphics || !this.activeTileLayout || !this.paletteSet) {
       return;
     }
 
@@ -190,7 +192,8 @@ export class MapObject {
           tileIndex,
           x * 8,
           y * 8,
-          this.palette
+          this.paletteSet,
+          0
         );
       }
     }

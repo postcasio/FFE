@@ -20,8 +20,8 @@ export enum Speed {
 
 export const tilesPerSecondMap = {
   [Speed.Slowest]: 1,
-  [Speed.Slow]: 2,
-  [Speed.Normal]: 3,
+  [Speed.Slow]: 1.5,
+  [Speed.Normal]: 2,
   [Speed.Fast]: 4,
   [Speed.Faster]: 8,
   [Speed.Fastest]: 12,
