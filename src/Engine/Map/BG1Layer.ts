@@ -205,13 +205,16 @@ export class BG12Layer implements Layer {
 
   updateScroll() {
     if (this.parallaxSpeedX) {
-      this.fineScrollPositionX += this.parallaxSpeedX / 60;
+      this.fineScrollPositionX =
+        (this.fineScrollPositionX + this.parallaxSpeedX / 60) % this.width;
+
       this.scrollPositionX = Math.round(this.fineScrollPositionX);
     } else {
       this.fineScrollPositionX = this.scrollPositionX;
     }
     if (this.parallaxSpeedY) {
-      this.fineScrollPositionY += this.parallaxSpeedY / 60;
+      this.fineScrollPositionY =
+        (this.fineScrollPositionY + this.parallaxSpeedY / 60) % this.height;
       this.scrollPositionY = Math.round(this.fineScrollPositionY);
     } else {
       this.fineScrollPositionY = this.scrollPositionY;
