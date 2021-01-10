@@ -45,6 +45,11 @@ export class BG12Layer implements Layer {
   shiftX = 0;
   shiftY = 0;
 
+  scrollPositionX = 0;
+  scrollPositionY = 0;
+  fineScrollPositionX = 0;
+  fineScrollPositionY = 0;
+
   parallaxSpeedX = 0;
   parallaxSpeedY = 0;
   parallaxMultiplierX = 1;
@@ -198,18 +203,47 @@ export class BG12Layer implements Layer {
     }, [] as number[]);
   }
 
-  renderDynamicTiles() {
+  updateScroll() {
+    if (this.parallaxSpeedX) {
+      this.fineScrollPositionX += this.parallaxSpeedX / 60;
+      this.scrollPositionX = Math.round(this.fineScrollPositionX);
+    } else {
+      this.fineScrollPositionX = this.scrollPositionX;
+    }
+    if (this.parallaxSpeedY) {
+      this.fineScrollPositionY += this.parallaxSpeedY / 60;
+      this.scrollPositionY = Math.round(this.fineScrollPositionY);
+    } else {
+      this.fineScrollPositionY = this.scrollPositionY;
+    }
+  }
+
+  renderDynamicTiles(
+    xOffset: number,
+    yOffset: number,
+    width: number,
+    height: number
+  ) {
     for (let i = 0; i < this.dynamicTiles.length; i++) {
       const tilemapIndex = this.dynamicTiles[i];
+      const x = (tilemapIndex % this.width) * this.tileWidth;
+      const y = Math.floor(tilemapIndex / this.width) * this.tileHeight;
 
-      this.tileset?.drawTile(
-        this.lowSurface,
-        this.highSurface,
-        this.tiles[tilemapIndex],
-        (tilemapIndex % this.width) * this.tileWidth,
-        Math.floor(tilemapIndex / this.width) * this.tileHeight,
-        true
-      );
+      if (
+        x >= xOffset - 16 &&
+        y >= yOffset - 16 &&
+        x <= xOffset + width &&
+        y <= yOffset + height
+      ) {
+        this.tileset?.drawTile(
+          this.lowSurface,
+          this.highSurface,
+          this.tiles[tilemapIndex],
+          x,
+          y,
+          true
+        );
+      }
     }
   }
 
@@ -218,15 +252,15 @@ export class BG12Layer implements Layer {
     y: number,
     w: number,
     h: number,
-    cameraX: number,
-    cameraY: number
+    xOffset: number,
+    yOffset: number
   ) {
     if (this.dirty) {
       this.updateDynamicTiles();
       this.render();
     }
 
-    this.renderDynamicTiles();
+    this.renderDynamicTiles(xOffset, yOffset, w, h);
 
     // this.lowShape.texture = this.lowSurface;
     // this.highShape.texture = this.highSurface;

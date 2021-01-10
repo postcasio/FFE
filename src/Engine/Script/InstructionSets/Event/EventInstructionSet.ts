@@ -53,6 +53,8 @@ import { instr_Fx_play_song } from "./Instructions/instr_Fx_play_song";
 import { instr_xx_object_script } from "./Instructions/instr_xx_object_script";
 import { instr_xx_pause } from "./Instructions/instr_xx_pause";
 import { instr_7x_set_obj_collision } from "./Instructions/instr_7x_set_obj_collision";
+import { instr_65_set_map_animation } from "./Instructions/instr_65_set_map_animation";
+import { instr_5x_set_bg_scroll } from "./Instructions/instr_5x_set_bg_scroll";
 
 export type EventInstructionHandlerArguments = InstructionHandlerPayload<
   EventInstructionSet,
@@ -108,6 +110,10 @@ eventInstructions.set(0x4b, instr_4x_show_msg);
 eventInstructions.set(0x59, instr_5x_fade);
 eventInstructions.set(0x5a, instr_5x_fade);
 eventInstructions.set(0x5c, instr_5C_wait_for_fade);
+eventInstructions.set(0x5d, instr_5x_set_bg_scroll);
+eventInstructions.set(0x5e, instr_5x_set_bg_scroll);
+eventInstructions.set(0x5f, instr_5x_set_bg_scroll);
+eventInstructions.set(0x65, instr_65_set_map_animation);
 eventInstructions.set(0x6a, instr_6x_set_map);
 eventInstructions.set(0x6b, instr_6x_set_map);
 eventInstructions.set(0x6c, instr_6C_set_parent_map);

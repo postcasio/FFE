@@ -6,10 +6,10 @@ export class PaletteSet {
   palettes: Palette[] = [];
   texture: Surface;
   dirty = true;
-  magnification = 4;
   colorsPerPalette: number;
   slice?: Slice;
   offset: number;
+  buffer: Uint8Array;
 
   constructor(slice: Slice | Color[][], colorsPerPalette?: number) {
     if (slice instanceof Slice) {
@@ -51,29 +51,41 @@ export class PaletteSet {
       }
     }
 
+    this.buffer = new Uint8Array(
+      this.colorsPerPalette * this.palettes.length * 4
+    );
+
     this.texture = new Surface(
-      this.palettes[0].colors.length * this.magnification,
-      this.palettes.length * this.magnification
+      this.palettes[0].colors.length,
+      this.palettes.length
     );
 
     this.texture.blendOp = BlendOp.Replace;
-
-    this.draw(this.texture, this.magnification);
   }
 
-  draw(target: Surface, size: number) {
-    let y = 0;
-
-    for (const palette of this.palettes) {
-      palette.draw(target, 0, y, size);
-
-      y += size;
+  updateBuffer() {
+    for (let i = 0; i < this.palettes.length; i++) {
+      for (let c = 0; c < this.palettes[i].colors.length; c++) {
+        this.buffer[(i * this.colorsPerPalette + c) * 4] =
+          this.palettes[i].colors[c].r * 255;
+        this.buffer[(i * this.colorsPerPalette + c) * 4 + 1] =
+          this.palettes[i].colors[c].g * 255;
+        this.buffer[(i * this.colorsPerPalette + c) * 4 + 2] =
+          this.palettes[i].colors[c].b * 255;
+        this.buffer[(i * this.colorsPerPalette + c) * 4 + 3] =
+          this.palettes[i].colors[c].a * 255;
+      }
     }
+  }
+
+  draw(target: Surface) {
+    target.upload(this.buffer);
   }
 
   getTexture() {
     if (this.dirty) {
-      this.draw(this.texture, this.magnification);
+      this.updateBuffer();
+      this.draw(this.texture);
       this.dirty = false;
     }
 

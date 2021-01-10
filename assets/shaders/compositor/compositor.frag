@@ -16,15 +16,15 @@ struct Layer {
 	bool math;
 };
 
-uniform Layer layers[6];
+uniform Layer layers[8];
 
 uniform float t;
 
 uniform vec2 output_size;
-uniform vec2 layer_sizes[6];
-uniform vec2 layer_offsets[6];
+uniform vec2 layer_sizes[8];
+uniform vec2 layer_offsets[8];
 
-varying vec2 layer_texcoords[6];
+varying vec2 layer_texcoords[8];
 varying vec2 texcoords;
 
 uniform float math_sign;
@@ -46,16 +46,18 @@ vec4 paletteLookup(vec4 color) {
 vec2 apply_uv_modifiers(int layer) {
 	vec2 uv = layer_texcoords[layer];
 
+	uv = fract(uv);
+
 	if (layers[layer].wavy_effect) {
-		float amplitudey = sin(t + (texcoords.y * output_size.y) / 10.0);
+		float amplitudey = sin(t*2.0) * sin(texcoords.y * 76.0);
 		// float amplitudey = sin(t / 20.0 + uv.y * 48.0);
 
 		vec2 displacement = vec2(
 			0.0,
-			floor(amplitudey * MAX_WAVY_DISPLACEMENT_Y + 0.5)
+			ceil(amplitudey * MAX_WAVY_DISPLACEMENT_Y + 0.5) / layer_sizes[layer]
 		);
 
-		uv -= displacement / output_size;
+		uv -= displacement;
 	}
 
 	return uv;
@@ -82,7 +84,7 @@ void main() {
 	vec4 color_sub = vec4(0.0, 0.0, 0.0, 0.0);
 	vec4 color_main = vec4(0.0, 0.0, 0.0, 0.0);
 
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 8; i++) {
 		if (!layers[i].subscreen) {
 			continue;
 		}
@@ -101,7 +103,7 @@ void main() {
 
 	depth = 0;
 
-	for (int j = 0; j < 6; j++) {
+	for (int j = 0; j < 8; j++) {
 		if (!layers[j].mainscreen) {
 			continue;
 		}

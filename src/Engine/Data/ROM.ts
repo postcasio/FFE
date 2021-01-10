@@ -30,6 +30,8 @@ import {
   ROM_OFFSET_MAP_PALETTE_ANIMATIONS,
   ROM_OFFSET_MAP_PALETTE_ANIMATION_PALETTES,
   ROM_OFFSET_MAP_PARALLAX,
+  ROM_OFFSET_MAP_TRIGGERS,
+  ROM_OFFSET_MAP_TRIGGER_POINTER_LIST,
   ROM_OFFSET_NPCS,
   ROM_OFFSET_NPC_POINTER_LIST,
   ROM_OFFSET_SPRITES_POINTER_LIST_HI,
@@ -71,6 +73,13 @@ export class Slice {
 
   slice(start: number, end?: number) {
     return new Slice(this.offset + start, this.data.slice(start, end));
+  }
+
+  concat(other: Slice) {
+    const newArr = new Uint8Array(this.data.length + other.data.length);
+    newArr.set(this.data, 0);
+    newArr.set(other.data, this.data.length);
+    return new Slice(this.offset, newArr);
   }
 }
 
@@ -358,6 +367,15 @@ export class ROM {
     );
   }
 
+  getInitialCharacterPaletteSetSlice() {
+    const offset = ROM_OFFSET_CHARACTER_PALETTES;
+
+    return new Slice(
+      offset,
+      this.getArraySlice(offset, offset + ROM_MAP_CHARACTER_PALETTE_SIZE * 8)
+    );
+  }
+
   getAnimatedMapGraphicsSlice() {
     return new Slice(
       ROM_OFFSET_ANIMATED_MAP_GRAPHICS,
@@ -493,5 +511,17 @@ export class ROM {
       ROM_OFFSET_SPRITE_TILE_FORMATIONS + index * 12,
       ROM_OFFSET_SPRITE_TILE_FORMATIONS + (index + 1) * 12
     );
+  }
+
+  getMapTriggerSlice(index: number) {
+    const pointer = this.getUint16(
+      ROM_OFFSET_MAP_TRIGGER_POINTER_LIST + index * 2
+    );
+    const nextPointer = this.getUint16(
+      ROM_OFFSET_MAP_TRIGGER_POINTER_LIST + (index + 1) * 2
+    );
+    const offset = ROM_OFFSET_MAP_TRIGGERS + pointer;
+    const next = ROM_OFFSET_MAP_TRIGGERS + nextPointer;
+    return new Slice(offset, this.getArraySlice(offset, next));
   }
 }

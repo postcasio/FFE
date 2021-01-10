@@ -84,6 +84,10 @@ export class BG1Tileset implements Tileset {
   ) {
     const tile = this.tiles[index];
 
+    if (!tile) {
+      return;
+    }
+
     for (let i = 0; i < tile.subtiles.length; i++) {
       const subtile = tile.subtiles[i];
 

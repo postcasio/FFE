@@ -93,4 +93,12 @@ export class MapProperties {
   get colorMathIndex() {
     return this.data[0x20];
   }
+
+  get mapWidth() {
+    return this.data[0x1e];
+  }
+
+  get mapHeight() {
+    return this.data[0x1f];
+  }
 }

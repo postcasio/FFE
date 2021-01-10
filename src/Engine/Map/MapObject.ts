@@ -30,6 +30,11 @@ export enum ObjectState {
   Moving,
 }
 
+export enum ZLevel {
+  Lower = 0,
+  Upper = 1,
+}
+
 export const OBJECT_ID_CHAR0 = 0x00;
 export const OBJECT_ID_CHAR1 = 0x01;
 export const OBJECT_ID_CHAR2 = 0x02;
@@ -65,7 +70,7 @@ export class MapObject {
   paletteIndex = 0;
   graphics?: Graphics;
   surface?: Surface;
-  paletteSet?: PaletteSet;
+
   eventBit = 0;
   exists = false;
   speed: Speed = Speed.Normal;
@@ -83,6 +88,8 @@ export class MapObject {
   subtileY = 0;
 
   riding: RidingType = RidingType.None;
+
+  zLevel: ZLevel = ZLevel.Lower;
 
   get absX() {
     return this.x * 16 + this.subtileX * 16;
@@ -108,10 +115,7 @@ export class MapObject {
 
   loadPalette(palette: number) {
     this.paletteIndex = palette;
-    this.paletteSet = new PaletteSet(
-      Game.current.rom.getCharacterPaletteSlice(palette),
-      16
-    );
+    SSj.log(`NPC palette Index ${palette}`);
   }
 
   loadGraphics(graphics: number) {
@@ -124,6 +128,7 @@ export class MapObject {
       8
     );
     this.graphics.name = `Sprite Graphics #${hex(graphics, 2)}`;
+    this.graphics.enablePaletteRendering();
   }
 
   loadNpc(npc: NPCData) {
@@ -162,7 +167,7 @@ export class MapObject {
   }
 
   render() {
-    if (!this.graphics || !this.activeTileLayout || !this.paletteSet) {
+    if (!this.graphics || !this.activeTileLayout || !this.map.paletteSet) {
       return;
     }
 
@@ -186,14 +191,13 @@ export class MapObject {
     for (let x = 0; x < columns; x++) {
       for (let y = 0; y < rows; y++) {
         const tileIndex = this.activeTileLayout.getTile(x + y * columns);
-
         this.graphics.drawTile(
           this.surface,
           tileIndex,
           x * 8,
           y * 8,
-          this.paletteSet,
-          0
+          this.map.paletteSet,
+          this.map.paletteSet.colorsPerPalette * (8 + this.paletteIndex)
         );
       }
     }
@@ -276,6 +280,22 @@ export class MapObject {
           if (!this.movingTiles) {
             this.state = ObjectState.Stationary;
             this.resolveMoving?.();
+
+            if (this.index === 0 && Game.current.playerCanMove()) {
+              const trigger = this.map.getTriggerAt(this.x, this.y);
+
+              if (trigger) {
+                SSj.log("HIT TRIGGER!");
+                SSj.log(
+                  `Starting event execution at ${hex(trigger.eventPointer, 6)}`
+                );
+                this.map.clearMovementKeys();
+                Game.current.scriptEngine.currentScript = Game.current.createScriptContext(
+                  trigger.eventPointer
+                );
+                Game.current.scriptEngine.step();
+              }
+            }
           } else {
             const time = (1 / tilesPerSecondMap[this.speed]) * 60;
             this.movingEnd = now + time;
@@ -301,20 +321,18 @@ export class MapObject {
     this.subtileY = 0;
   }
 
-  draw(target: Surface, cameraX: number, cameraY: number) {
-    const xOffset = cameraX - target.width / 2 + 8;
-    const yOffset = cameraY - target.height / 2;
+  draw(target: Surface) {
+    // const xOffset = cameraX - target.width / 2 + 8;
+    // const yOffset = cameraY - target.height / 2;
 
-    const x = -xOffset + this.absX;
-    const y = -yOffset + this.absY - this.getRenderOffset();
+    // const x = -xOffset + this.absX;
+    // const y = -yOffset + this.absY - this.getRenderOffset();
+
+    const x = this.absX;
+    const y = this.absY - this.getRenderOffset();
 
     if (this.exists && this.visible && this.surface) {
       Prim.blit(target, x, y, this.surface);
-      const color =
-        objectStateColors[
-          this.objectScriptContext?.state || ScriptContextState.Waiting
-        ];
-      // Prim.drawSolidRectangle(target, x, y, 3, 3, color);
     }
   }
 }

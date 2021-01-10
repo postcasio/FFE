@@ -3,12 +3,12 @@ attribute vec4 al_pos;
 attribute vec2 al_texcoord;
 
 uniform mat4 al_projview_matrix;
-uniform vec2 layer_offsets[6];
-uniform vec2 layer_sizes[6];
+uniform vec2 layer_offsets[8];
+uniform vec2 layer_sizes[8];
 uniform vec2 output_size;
 
 // input to fragment shader
-varying vec2 layer_texcoords[6];
+varying vec2 layer_texcoords[8];
 varying vec2 texcoords;
 
 float map(float value, float inMin, float inMax, float outMin, float outMax) {
@@ -20,7 +20,7 @@ void main()
 	gl_Position = al_projview_matrix * al_pos;
 	texcoords = al_texcoord;
 
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 8; i++) {
 		float layer_width = output_size.x / layer_sizes[i].x;
 		float layer_height = output_size.y / layer_sizes[i].y;
 

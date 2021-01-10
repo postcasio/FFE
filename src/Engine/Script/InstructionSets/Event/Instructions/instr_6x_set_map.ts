@@ -1,13 +1,8 @@
 import { FadingDirection } from "@/src/Engine/Fader";
-import { OBJECT_ID_CHAR0 } from "@/src/Engine/Map/MapObject";
+import { OBJECT_ID_CHAR0, ZLevel } from "@/src/Engine/Map/MapObject";
 import { Direction } from "../../../Direction";
 import { VehicleType } from "../../../VehicleType";
 import { EventInstructionHandlerArguments } from "../EventInstructionSet";
-
-enum ZLevel {
-  Lower = 0,
-  Upper = 1,
-}
 
 export function instr_6x_set_map({
   stream,
@@ -55,6 +50,7 @@ export function instr_6x_set_map({
   game.mapEngine.objects[OBJECT_ID_CHAR0].subtileX = 0;
   game.mapEngine.objects[OBJECT_ID_CHAR0].y = y;
   game.mapEngine.objects[OBJECT_ID_CHAR0].subtileY = 0;
+  game.mapEngine.objects[OBJECT_ID_CHAR0].zLevel = zlevel;
   game.mapEngine.updateCamera(true);
 
   if (fadeIn) {

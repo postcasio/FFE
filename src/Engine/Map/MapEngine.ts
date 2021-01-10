@@ -13,9 +13,15 @@ import { AnimatedTileset } from "./AnimatedTileset";
 import { BG12Layer, ZLevel } from "./BG1Layer";
 import { BG1Tileset } from "./BG1Tileset";
 import { Layer, LayerType } from "./Layer";
-import { MapObject, ObjectState, OBJECT_ID_CAMERA } from "./MapObject";
+import {
+  MapObject,
+  ObjectState,
+  OBJECT_ID_CAMERA,
+  ZLevel as ObjectZLevel,
+} from "./MapObject";
 import { MapProperties } from "./MapProperties";
 import { BG3Tileset } from "./BG3Tileset";
+import { Trigger } from "./Trigger";
 
 export enum MathLayer {
   Layer1 = 1,
@@ -37,6 +43,9 @@ const blend = new BlendOp(
 export class MapEngine {
   name = "";
   index?: number;
+
+  mapWidth = 0;
+  mapHeight = 0;
 
   layers = {
     [LayerType.BG1]: new BG12Layer(),
@@ -65,6 +74,8 @@ export class MapEngine {
 
   layer3Priority = false;
 
+  triggers: Trigger[] = [];
+
   math: {
     index: number;
     half: boolean;
@@ -83,6 +94,9 @@ export class MapEngine {
 
   compositorModel!: Model;
   compositorShape!: Shape;
+
+  spriteLayerLow?: Surface;
+  spriteLayerHigh?: Surface;
 
   constructor() {
     this.animatedGraphics = new Graphics(
@@ -176,7 +190,9 @@ export class MapEngine {
     graphics.name = `Map Graphics Combined #${index}`;
 
     const paletteSet = new PaletteSet(
-      Game.current.rom.getMapPaletteSetSlice(properties.paletteIndex),
+      Game.current.rom
+        .getMapPaletteSetSlice(properties.paletteIndex)
+        .concat(Game.current.rom.getInitialCharacterPaletteSetSlice()),
       16
     );
 
@@ -320,6 +336,26 @@ export class MapEngine {
     bg3.mainscreen = (this.math.mainScreen & MathLayer.Layer3) !== 0;
     bg3.subscreen = (this.math.subScreen & MathLayer.Layer3) !== 0;
 
+    this.mapWidth =
+      properties.mapWidth === 0
+        ? Math.max(...[bg1, bg2, bg3].map((layer) => layer.tileWidth))
+        : properties.mapWidth;
+    this.mapHeight =
+      properties.mapHeight === 0
+        ? Math.max(...[bg1, bg2, bg3].map((layer) => layer.tileHeight))
+        : properties.mapHeight;
+
+    this.triggers = [];
+
+    const triggers = Game.current.rom.getMapTriggerSlice(index);
+
+    const triggerCount = triggers.length / 5;
+
+    for (let i = 0; i < triggerCount; i++) {
+      this.triggers.push(new Trigger(triggers.slice(i * 5, (i + 1) * 5)));
+    }
+
+    SSj.log(this.triggers);
     this.update();
   }
 
@@ -375,6 +411,10 @@ export class MapEngine {
     if (this.animatedPalette) {
       this.animatedPalette.update();
     }
+
+    this.layers[LayerType.BG1].updateScroll();
+    this.layers[LayerType.BG2].updateScroll();
+    this.layers[LayerType.BG3].updateScroll();
   }
 
   updateCamera(force = false) {
@@ -405,16 +445,47 @@ export class MapEngine {
       return;
     }
 
+    const bg1 = this.layers[LayerType.BG1];
+    const bg2 = this.layers[LayerType.BG2];
+    const bg3 = this.layers[LayerType.BG3];
+
     const shader = this.compositorModel.shader;
     if (!shader) return;
 
     const cameraX = this.objects[OBJECT_ID_CAMERA].absX;
     const cameraY = this.objects[OBJECT_ID_CAMERA].absY;
 
-    for (const layer of Object.values(this.layers)) {
-      layer.frameRender(0, 0, target.width, target.height, cameraX, cameraY);
+    if (
+      !this.spriteLayerLow ||
+      !this.spriteLayerHigh ||
+      this.spriteLayerLow.width !== bg1.lowSurface.width ||
+      this.spriteLayerLow.height !== bg1.lowSurface.height ||
+      this.spriteLayerHigh.width !== bg2.lowSurface.width ||
+      this.spriteLayerHigh.height !== bg2.lowSurface.height
+    ) {
+      this.spriteLayerLow = new Surface(
+        bg1.lowSurface.width,
+        bg1.lowSurface.height
+      );
+      this.spriteLayerHigh = new Surface(
+        bg2.lowSurface.width,
+        bg2.lowSurface.height
+      );
     }
 
+    this.spriteLayerLow.clear(Color.Transparent);
+    this.spriteLayerHigh.clear(Color.Transparent);
+
+    for (const object of this.objects) {
+      switch (object.zLevel) {
+        case ObjectZLevel.Lower:
+          object.draw(this.spriteLayerLow);
+          break;
+        case ObjectZLevel.Upper:
+          object.draw(this.spriteLayerHigh);
+          break;
+      }
+    }
     shader.setSampler("palette", this.paletteSet.getTexture(), 2);
     shader.setFloat("t", Sphere.now() / 10);
     shader.setFloatVector("output_size", [target.width, target.height]);
@@ -424,44 +495,72 @@ export class MapEngine {
       shader.setFloat("math_multiplier", this.math.half ? 0.5 : 1.0);
     }
 
-    const bg1 = this.layers[LayerType.BG1];
-    const bg2 = this.layers[LayerType.BG2];
-    const bg3 = this.layers[LayerType.BG3];
-
-    const layerOrder: Array<[BG12Layer, Surface, ZLevel]> = [
-      [bg1, bg1.lowSurface, bg1.zLevels[0]],
-      [bg1, bg1.highSurface, bg1.zLevels[1]],
-      [bg2, bg2.lowSurface, bg2.zLevels[0]],
-      [bg2, bg2.highSurface, bg2.zLevels[1]],
-      [bg3, bg3.lowSurface, bg3.zLevels[0]],
-      [bg3, bg3.highSurface, bg3.zLevels[1]],
+    const layerOrder: Array<[boolean, BG12Layer, Surface, ZLevel]> = [
+      [true, bg1, bg1.lowSurface, bg1.zLevels[0]],
+      [true, bg1, bg1.highSurface, bg1.zLevels[1]],
+      [true, bg2, bg2.lowSurface, bg2.zLevels[0]],
+      [true, bg2, bg2.highSurface, bg2.zLevels[1]],
+      [true, bg3, bg3.lowSurface, bg3.zLevels[0]],
+      [true, bg3, bg3.highSurface, bg3.zLevels[1]],
+      [false, bg1, this.spriteLayerLow, ZLevel.snesS2],
+      [false, bg2, this.spriteLayerHigh, ZLevel.snesS3],
     ];
     // log: [[{},11],[{},15],[{},10],[{},14],[{},3],[{},17]]
     // SSj.log(layerOrder.map((l) => l.slice(1)));
 
-    for (let i = 0; i < 6; i++) {
-      const [layer, surface, zLevel] = layerOrder[i];
-      shader.setSampler(`layers[${i}].tex`, surface, 2 + i);
+    for (let i = 0; i < 8; i++) {
+      const [tileLayer, layer, surface, zLevel] = layerOrder[i];
 
       const xOffset =
         cameraX / layer.parallaxMultiplierX +
+        layer.scrollPositionX +
         layer.shiftX * 16 -
         target.width / 2 +
         8;
       const yOffset =
         cameraY / layer.parallaxMultiplierY +
+        layer.scrollPositionY +
         layer.shiftY * 16 -
         target.height / 2;
+
+      if (tileLayer) {
+        layer.frameRender(0, 0, target.width, target.height, xOffset, yOffset);
+      }
+
+      shader.setSampler(`layers[${i}].tex`, surface, 2 + i);
       shader.setFloatVector(`layers[${i}].size`, [
         surface.width,
         surface.height,
       ]);
-      shader.setBoolean(`layers[${i}].math`, layer.math);
-      shader.setBoolean(`layers[${i}].wavy_effect`, layer.wavyEffect);
+      /**
+       * (this.math.mathLayers & MathLayer.Sprites) !== 0,
+        (this.math.subScreen & MathLayer.Sprites) !== 0,
+        (this.math.mainScreen & MathLayer.Sprites) !== 0,
+       */
+      shader.setBoolean(
+        `layers[${i}].math`,
+        tileLayer
+          ? layer.math
+          : (this.math.mathLayers & MathLayer.Sprites) !== 0
+      );
+      shader.setBoolean(
+        `layers[${i}].wavy_effect`,
+        tileLayer ? layer.wavyEffect : false
+      );
       shader.setBoolean(`layers[${i}].wavy_effect_battle`, false);
       shader.setInt(`layers[${i}].depth`, zLevel);
-      shader.setBoolean(`layers[${i}].subscreen`, layer.subscreen);
-      shader.setBoolean(`layers[${i}].mainscreen`, layer.mainscreen);
+      shader.setBoolean(
+        `layers[${i}].subscreen`,
+        tileLayer
+          ? layer.subscreen
+          : (this.math.subScreen & MathLayer.Sprites) !== 0
+      );
+      shader.setBoolean(
+        `layers[${i}].mainscreen`,
+        tileLayer
+          ? layer.mainscreen
+          : (this.math.mainScreen & MathLayer.Sprites) !== 0
+      );
       shader.setFloatVector(`layer_offsets[${i}]`, [xOffset, yOffset]);
       shader.setFloatVector(`layer_sizes[${i}]`, [
         surface.width,
@@ -509,9 +608,8 @@ export class MapEngine {
   }
 
   acceptInput(input: InputMapping) {
+    SSj.log(input);
     let direction;
-
-    const object = this.objects[0];
 
     switch (input.intent) {
       case Intent.Up:
@@ -546,5 +644,19 @@ export class MapEngine {
         break;
       }
     }
+  }
+
+  getTriggerAt(x: number, y: number) {
+    for (const trigger of this.triggers) {
+      if (trigger.x === x && trigger.y === y) {
+        return trigger;
+      }
+    }
+
+    return undefined;
+  }
+
+  clearMovementKeys() {
+    this.directionInputsHeld = [];
   }
 }

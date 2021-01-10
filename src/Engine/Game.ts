@@ -105,7 +105,7 @@ export class Game {
       Game.rom.getVariableWidthFontCharacterWidthsSlice()
     );
 
-    this.messageBox = new MessageBox(this, this.screen);
+    this.messageBox = new MessageBox(this);
 
     await this.mapEngine.initialize();
 
@@ -115,12 +115,12 @@ export class Game {
   render() {
     this.screen.clear(Color.Black);
     this.mapEngine.composite(this.screen);
-    this.messageBox.render();
+    this.messageBox.draw(this.screen);
     this.fader.render();
-    Prim.drawSolidRectangle(this.screen, 0, 0, 256, 8, Color.Black);
-    Prim.drawSolidRectangle(this.screen, 0, 216, 256, 8, Color.Black);
-    Prim.drawSolidRectangle(this.screen, 0, 0, 8, 224, Color.Black);
-    Prim.drawSolidRectangle(this.screen, 248, 0, 8, 224, Color.Black);
+    // Prim.drawSolidRectangle(this.screen, 0, 0, 256, 8, Color.Black);
+    // Prim.drawSolidRectangle(this.screen, 0, 216, 256, 8, Color.Black);
+    // Prim.drawSolidRectangle(this.screen, 0, 0, 8, 224, Color.Black);
+    // Prim.drawSolidRectangle(this.screen, 248, 0, 8, 224, Color.Black);
     if (this.mapEngine.paletteSet) {
       Prim.blit(this.screen, 0, 0, this.mapEngine.paletteSet.getTexture());
     }
@@ -156,6 +156,10 @@ export class Game {
     });
   }
 
+  playerCanMove() {
+    return this.scriptEngine.currentScript?.isFinished() || true;
+  }
+
   dispatchInput(input: InputMapping) {
     switch (input.intent) {
       case Intent.Accept:
@@ -170,7 +174,7 @@ export class Game {
       case Intent.Down:
       case Intent.Left:
       case Intent.Right:
-        if (this.scriptEngine.currentScript?.isFinished()) {
+        if (this.playerCanMove()) {
           this.mapEngine.acceptInput(input);
         }
 

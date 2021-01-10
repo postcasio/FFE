@@ -1,3 +1,4 @@
+import Prim from "prim";
 import { Game } from "../Game";
 import { Graphics } from "../Graphics/Graphics";
 import { PaletteSet } from "../Graphics/PaletteSet";
@@ -11,26 +12,17 @@ export class Window {
 
   smoothGradient = true;
 
+  cache: Map<string, Surface> = new Map();
+
   constructor(graphics: Graphics, paletteSet: PaletteSet) {
     this.graphics = graphics;
     this.paletteSet = paletteSet;
   }
 
-  async initialize() {
-    await this.graphics.loadShader("window", this.setupShader.bind(this));
-  }
-
   static async create(graphics: Graphics, paletteSet: PaletteSet) {
     const window = new Window(graphics, paletteSet);
 
-    await window.initialize();
-
     return window;
-  }
-
-  setupShader(shader: Shader) {
-    shader.setFloat("screen_height", Game.current.screen.height);
-    shader.setBoolean("smooth_gradient", this.smoothGradient);
   }
 
   setStyle(index: number) {
@@ -55,38 +47,55 @@ export class Window {
     widthInTiles: number,
     heightInTiles: number
   ) {
-    this.drawTile(target, 16, x, y);
+    const key = `${x},${y},${widthInTiles},${heightInTiles}`;
 
-    for (let i = 0; i < widthInTiles - 2; i++) {
-      this.drawTile(target, 17 + (i & 0x1), x + (i + 1) * 8, y);
+    let cache = this.cache.get(key);
+
+    if (cache) {
+      Prim.blit(target, x, y, cache);
+      return;
     }
 
-    this.drawTile(target, 19, x + (widthInTiles - 1) * 8, y);
+    cache = new Surface(widthInTiles * 8, heightInTiles * 8, Color.Transparent);
 
-    y += 8;
+    let ty = 0;
+
+    this.drawTile(cache, 16, 0, ty);
+
+    for (let i = 0; i < widthInTiles - 2; i++) {
+      this.drawTile(cache, 17 + (i & 0x1), (i + 1) * 8, ty);
+    }
+
+    this.drawTile(cache, 19, (widthInTiles - 1) * 8, ty);
+
+    ty += 8;
 
     let pattern = 0;
 
-    for (let my = 0; my < heightInTiles; my++) {
-      this.drawTile(target, 20 + (my & 0x1) * 2, x, y);
+    for (let my = 0; my < heightInTiles - 2; my++) {
+      this.drawTile(cache, 20 + (my & 0x1) * 2, 0, ty);
 
       for (let i = 0; i < widthInTiles - 2; i++) {
-        this.drawTile(target, pattern * 4 + (i % 4), x + (i + 1) * 8, y);
+        this.drawTile(cache, pattern * 4 + (i % 4), (i + 1) * 8, ty);
       }
 
-      this.drawTile(target, 21 + (my & 0x1) * 2, x + (widthInTiles - 1) * 8, y);
+      this.drawTile(cache, 21 + (my & 0x1) * 2, (widthInTiles - 1) * 8, ty);
 
       pattern = (pattern + 1) % 4;
 
-      y += 8;
+      ty += 8;
     }
 
-    this.drawTile(target, 24, x, y);
+    this.drawTile(cache, 24, 0, ty);
 
     for (let i = 0; i < widthInTiles - 2; i++) {
-      this.drawTile(target, 25 + (i & 0x1), x + (i + 1) * 8, y);
+      this.drawTile(cache, 25 + (i & 0x1), (i + 1) * 8, ty);
     }
 
-    this.drawTile(target, 27, x + (widthInTiles - 1) * 8, y);
+    this.drawTile(cache, 27, (widthInTiles - 1) * 8, ty);
+
+    this.cache.set(key, cache);
+
+    Prim.blit(target, 0, 0, cache);
   }
 }

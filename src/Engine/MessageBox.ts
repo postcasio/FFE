@@ -9,6 +9,15 @@ import { TextWrap } from "./TextWrap";
 
 const bg = new Color(0.3, 0.3, 0.6, 0.8);
 
+const height = 72;
+const width = 240;
+const left = 8;
+const top = 8;
+const paddingY = 8;
+const paddingX = 8;
+const textWidth = width - paddingX * 2;
+const textHeight = height - paddingY * 2;
+
 export enum MessageBoxPosition {
   Top = 0,
   Bottom = 1,
@@ -45,11 +54,9 @@ export class MessageBox {
   callbacksOnDidFinish: Array<() => void> = [];
   callbacksOnDidEmit: Array<() => void> = [];
 
-  surface: Surface;
-
-  constructor(game: Game, surface: Surface) {
+  constructor(game: Game) {
     this.game = game;
-    this.surface = surface;
+
     this.text = new TextWrap(this.game.variableWidthFont, 256 - 40);
   }
 
@@ -101,40 +108,26 @@ export class MessageBox {
     return this.state === State.Writing;
   }
 
-  render() {
-    const height = 72;
-    const width = 240;
-    const left = 8;
-    const top = 8;
-    const paddingY = 8;
-    const paddingX = 8;
-    const textWidth = width - paddingX * 2;
-    const textHeight = height - paddingY * 2;
-
+  draw(target: Surface) {
     if (this.isOpen()) {
       const y =
         this.position === MessageBoxPosition.Top
           ? top
-          : this.surface.height - height - top;
+          : target.height - height - top;
 
       if (!this.transparent) {
-        Game.current.window.draw(this.surface, left, top, 30, 7);
+        Game.current.window.draw(target, left, y, 30, 9);
       }
 
-      this.surface.clipTo(
-        left + paddingX,
-        y + paddingY,
-        textWidth,
-        textHeight + 1
-      );
+      target.clipTo(left + paddingX, y + paddingY, textWidth, textHeight + 1);
 
       this.text.render(
-        this.surface,
+        target,
         left + paddingX,
         y + paddingY + this.textYOffset
       );
 
-      this.surface.clipTo(0, 0, this.surface.width, this.surface.height);
+      target.clipTo(0, 0, target.width, target.height);
     }
   }
 

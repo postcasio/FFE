@@ -91,3 +91,6 @@ export const ROM_MAP_PALETTE_ANIMATION_PALETTE_SIZE = 32;
 
 export const ROM_OFFSET_COLOR_MATH = hirom(0xc0fe00);
 export const ROM_COLOR_MATH_SIZE = 3;
+
+export const ROM_OFFSET_MAP_TRIGGER_POINTER_LIST = hirom(0xc40000);
+export const ROM_OFFSET_MAP_TRIGGERS = hirom(0xc40000);

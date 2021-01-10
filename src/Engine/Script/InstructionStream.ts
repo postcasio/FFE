@@ -1,5 +1,6 @@
 import { ROM_OFFSET_EVENT_SCRIPTS } from "../Data/offsets";
 import { ROM } from "@/src/Engine/Data/ROM";
+import { hex } from "../utils";
 
 export class InstructionStream {
   ip = 0;
@@ -8,6 +9,7 @@ export class InstructionStream {
 
   constructor(rom: ROM, offset: number) {
     this.rom = rom;
+    SSj.log(`Creating instruction stream at ${hex(offset, 6)}`);
     this.offset = offset;
   }
 

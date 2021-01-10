@@ -22,7 +22,7 @@ Object.assign(Sphere.Game, {
   name: "ffe",
   author: "casiotone",
   summary: "",
-  resolution: "1280x1024",
+  resolution: "800x600",
 
   saveID: "ffe",
 
