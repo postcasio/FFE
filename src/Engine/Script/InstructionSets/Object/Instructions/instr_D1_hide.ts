@@ -12,5 +12,5 @@ export function instr_D1_hide({
 
   context.disasm("hide", "");
 
-  object.visible = false;
+  object.setVisible(false);
 }

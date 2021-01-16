@@ -3,6 +3,8 @@
 		"target": "es2017",
 		"lib": [ "es2017" ],
 		"module": "es2015",
+		"moduleResolution": "node",
+		"allowSyntheticDefaultImports": true,
 		"baseUrl": "lib",
 		"paths": {
 			"@/*": [ "../*" ],

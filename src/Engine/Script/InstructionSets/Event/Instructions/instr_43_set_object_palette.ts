@@ -13,6 +13,5 @@ export function instr_43_set_object_palette({
 
   context.disasm("set_obj_pal", `#$${hex(object, 2)} #$${hex(palette, 2)}`);
 
-  game.mapEngine.objects[object].loadPalette(palette);
-  game.mapEngine.objects[object].render();
+  game.mapEngine.getObject(object)!.loadPalette(palette);
 }

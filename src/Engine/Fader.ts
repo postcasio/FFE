@@ -7,10 +7,15 @@ export enum FadingDirection {
 
 export class Fader {
   fading = false;
+  pendingFade = false;
 
   fadingDirection: FadingDirection = FadingDirection.In;
   fadingStarted = 0;
   fadingEnds = 0;
+
+  fadingPromise?: Promise<void>;
+  fadingResolve?: () => void;
+  fadingReject?: () => void;
 
   color: Color = new Color(0, 0, 0, 1);
 
@@ -51,6 +56,11 @@ export class Fader {
     this.fadingStarted = Sphere.now();
     this.fadingEnds = this.fadingStarted + (1 / speed) * 240;
     this.fading = true;
+    this.fadingPromise = new Promise((res, rej) => {
+      this.fadingResolve = res;
+      this.fadingReject = rej;
+    });
+    return this.fadingPromise;
   }
 
   update() {
@@ -68,6 +78,8 @@ export class Fader {
       }
 
       this.callbacksOnDidFinish = [];
+
+      this.fadingResolve?.();
 
       this.fading = false;
     } else {

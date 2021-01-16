@@ -31,6 +31,8 @@ export class ScriptContext<
 
   callbacksOnDidFinish: Array<() => void> = [];
 
+  log: string[] = [];
+
   constructor(game: Game, instructionSet: T, ip: number, payload: P) {
     this.game = game;
     this.instructionSet = instructionSet;
@@ -58,10 +60,7 @@ export class ScriptContext<
   }
 
   isFinished() {
-    return (
-      this.state === ScriptContextState.Finished ||
-      this.state === ScriptContextState.Error
-    );
+    return this.state === ScriptContextState.Finished;
   }
 
   stepUntilWaiting() {
@@ -102,15 +101,22 @@ export class ScriptContext<
     const bytes = Array.from(
       this.stream.rom.getArraySlice(this.lastRawIP, this.stream.rawIP)
     );
-    SSj.log(
-      `${Sphere.now().toString().padStart(8, " ")} : ${
-        this.instructionSet.disasmPrefix
-      } ${hex(this.lastIP, 6)} : ${bytes
+
+    const line = `${Sphere.now().toString().padStart(8, " ")} : ${
+      this.instructionSet.disasmPrefix
+    } ${hex(this.lastIP, 6)} : ${(
+      bytes
         .slice(0, bytes.length - trimEnd)
         .map((byte) => hex(byte, 2))
-        .join(" ")
-        .padEnd(18, " ")} : ${mnemonic} ${args}`
-    );
+        .join(" ") + (trimEnd > 0 ? ` ...[${trimEnd}]` : "")
+    ).padEnd(18, " ")} : ${mnemonic} ${args}`;
+
+    SSj.log(line);
+
+    this.log.push(`${hex(this.lastIP, 6)}: ${mnemonic} ${args}`);
+    if (this.log.length > 20) {
+      this.log.shift();
+    }
   };
 
   callSubroutine(offset: number) {
@@ -131,7 +137,7 @@ export class ScriptContext<
   waitForPromise(promise: Promise<void>) {
     this.state = ScriptContextState.Waiting;
 
-    promise.then(() => {
+    return promise.then(() => {
       if (this.state === ScriptContextState.Waiting) {
         this.state = ScriptContextState.Executing;
       }

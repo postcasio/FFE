@@ -22,6 +22,9 @@ import { InputManager } from "./Input/InputManager";
 import { initializeDefaultMappings } from "./Input/defaultMappings";
 import { InputMapping, InputMappingType } from "./Input/InputMapping";
 import { Intent } from "./Input/Intent";
+import { SpriteAnimationType } from "./Map/Sprite";
+import { Debugger } from "./Debugger/Debugger";
+import { FixedWidthFont } from "./Fonts/FixedWidthFont";
 
 export class Game {
   static rom: ROM;
@@ -34,17 +37,20 @@ export class Game {
   fader: Fader;
   messageBox!: MessageBox;
   variableWidthFont!: VariableWidthFont;
+  fixedWidthFont!: FixedWidthFont;
   screen: Surface = new Surface(256, 224);
   screenShape: Shape;
   screenTransform: Transform;
   window!: Window;
   inputManager: InputManager;
-
-  disasmPrefixes = ["EVT"]; // EVT, MSG, OBJ
+  debugger: Debugger;
+  disasmPrefixes = ["OBJ", "EVT"]; // EVT, MSG, OBJ
+  paused = false;
 
   constructor(rom: ROM) {
     Game.current = this;
     Game.rom = rom;
+    this.debugger = new Debugger(this);
     this.rom = rom;
     this.mapEngine = new MapEngine();
     this.scriptEngine = new ScriptEngine(this);
@@ -61,15 +67,12 @@ export class Game {
       ])
     );
     this.screenTransform = new Transform();
-    const scale = 0.975;
-    this.screenTransform.scale(
-      Surface.Screen.width * scale,
-      Surface.Screen.height * scale
-    );
-    this.screenTransform.translate(
-      (Surface.Screen.width * (1 - scale)) / 2,
-      (Surface.Screen.height * (1 - scale)) / 2
-    );
+
+    const height = Surface.Screen.height;
+    const width = height * 1.33;
+
+    this.screenTransform.scale(width, height);
+    this.screenTransform.translate(0, 0);
     this.inputManager = new InputManager();
 
     initializeDefaultMappings(this.inputManager);
@@ -105,6 +108,17 @@ export class Game {
       Game.rom.getVariableWidthFontCharacterWidthsSlice()
     );
 
+    const fwfGraphics = new Graphics(
+      Game.rom.getFixedWidthFontGraphicsSlice(),
+      GraphicsFormat.Snes2bpp,
+      8,
+      8
+    );
+
+    vwfGraphics.name = "Fixed Width Font Graphics";
+
+    this.fixedWidthFont = await FixedWidthFont.create(fwfGraphics);
+
     this.messageBox = new MessageBox(this);
 
     await this.mapEngine.initialize();
@@ -121,19 +135,64 @@ export class Game {
     // Prim.drawSolidRectangle(this.screen, 0, 216, 256, 8, Color.Black);
     // Prim.drawSolidRectangle(this.screen, 0, 0, 8, 224, Color.Black);
     // Prim.drawSolidRectangle(this.screen, 248, 0, 8, 224, Color.Black);
-    if (this.mapEngine.paletteSet) {
-      Prim.blit(this.screen, 0, 0, this.mapEngine.paletteSet.getTexture());
-    }
 
+    //this.renderPaletteDebug();
+    //this.renderSpriteDebug();
+    this.debugger.render();
     this.screenShape.draw(Surface.Screen, this.screenTransform);
   }
 
+  renderPaletteDebug() {
+    if (this.mapEngine.paletteSet) {
+      Prim.blit(this.screen, 0, 0, this.mapEngine.paletteSet.getTexture());
+    }
+  }
+
+  renderSpriteDebug() {
+    let x = 0;
+    for (const anim of [
+      SpriteAnimationType.WalkingUp,
+      SpriteAnimationType.WalkingRight,
+      SpriteAnimationType.WalkingDown,
+      SpriteAnimationType.WalkingLeft,
+    ]) {
+      for (let i = 0; i < 4; i++) {
+        Font.Default.drawText(
+          this.screen,
+          i * 64,
+          x * 48 + 24,
+          this.mapEngine.objects[0].sprite.animations[anim].frames[i].toString()
+        );
+        this.mapEngine.objects[0].sprite?.draw(
+          this.screen,
+          this.screen,
+          i * 64,
+          x * 48,
+          this.mapEngine.objects[0].sprite.animations[anim],
+          i,
+          this.mapEngine.objects[0].graphics!,
+          this.mapEngine.paletteSet!,
+          (this.mapEngine.objects[0].paletteIndex + 8) * 16
+        );
+        // Font.Default.drawText(
+        //   this.screen,
+        //   x * 32,
+        //   i * 32 - 10,
+        //   this.mapEngine.objects[0].sprite.animations[anim].frames[i].toString()
+        // );
+      }
+      x++;
+    }
+  }
+
   update() {
-    this.inputManager.dispatchInputs();
-    this.mapEngine.update();
-    this.scriptEngine.step();
-    this.fader.update();
-    this.messageBox.update();
+    if (!this.paused) {
+      this.inputManager.dispatchInputs();
+      this.mapEngine.update();
+      this.scriptEngine.step();
+      this.fader.update();
+      this.messageBox.update();
+    }
   }
 
   createScriptContext(pointer: number) {
@@ -157,7 +216,9 @@ export class Game {
   }
 
   playerCanMove() {
-    return this.scriptEngine.currentScript?.isFinished() || true;
+    return this.scriptEngine.currentScript
+      ? this.scriptEngine.currentScript.isFinished()
+      : true;
   }
 
   dispatchInput(input: InputMapping) {
@@ -166,7 +227,7 @@ export class Game {
       case Intent.HurryMessage:
         if (this.messageBox.isOpen()) {
           this.messageBox.acceptInput(input);
-        } else {
+        } else if (this.playerCanMove()) {
           this.mapEngine.acceptInput(input);
         }
         break;
@@ -180,5 +241,9 @@ export class Game {
 
         break;
     }
+  }
+
+  setPaused(paused: boolean) {
+    this.paused = paused;
   }
 }

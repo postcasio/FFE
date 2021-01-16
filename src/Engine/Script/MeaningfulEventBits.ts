@@ -1,0 +1,7 @@
+export const EVENT_BIT_PARTY_FACING_UP = 432;
+export const EVENT_BIT_PARTY_FACING_RIGHT = 433;
+export const EVENT_BIT_PARTY_FACING_DOWN = 434;
+export const EVENT_BIT_PARTY_FACING_LEFT = 435;
+export const EVENT_BIT_A_BUTTON_PRESSED = 436;
+
+export const EVENT_BYTE_CASE_WORD = 52;

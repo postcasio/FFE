@@ -13,6 +13,5 @@ export function instr_37_set_object_graphics({
 
   context.disasm("set_obj_gfx", `#$${hex(object, 2)} #$${hex(graphics, 2)}`);
 
-  game.mapEngine.objects[object].loadSprite(graphics);
-  game.mapEngine.objects[object].render();
+  game.mapEngine.getObject(object)?.loadSprite(graphics);
 }

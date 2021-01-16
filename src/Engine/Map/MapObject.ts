@@ -1,25 +1,35 @@
-import { ROM } from "@/src/Engine/Data/ROM";
-import Prim from "prim";
-import { Palette } from "../Graphics/Palette";
 import { Direction } from "../Script/Direction";
 import { EventScriptContext } from "../Script/InstructionSets/Event/EventInstructionSet";
 import { ObjectScriptContext } from "../Script/InstructionSets/Object/ObjectInstructionSet";
 import { RidingType } from "../Script/RidingType";
-import { ScriptContextState } from "../Script/ScriptContext";
-import { MapEngine } from "./MapEngine";
+import { MapEngine, TileProperties } from "./MapEngine";
 import { NPCData, Speed, tilesPerSecondMap } from "./NPCData";
 import { Graphics, GraphicsFormat } from "../Graphics/Graphics";
 import { SpriteTileLayout } from "./SpriteTileLayout";
 import { Game } from "../Game";
 import { hex } from "../utils";
-import { PaletteSet } from "../Graphics/PaletteSet";
+import { Sprite, SpriteAnimationType } from "./Sprite";
+import { LayerType } from "./Layer";
+import {
+  EVENT_BIT_PARTY_FACING_DOWN,
+  EVENT_BIT_PARTY_FACING_LEFT,
+  EVENT_BIT_PARTY_FACING_RIGHT,
+  EVENT_BIT_PARTY_FACING_UP,
+} from "../Script/MeaningfulEventBits";
 
-const objectStateColors = {
-  [ScriptContextState.Executing]: Color.Green,
-  [ScriptContextState.Waiting]: Color.Orange,
-  [ScriptContextState.Finished]: Color.Purple,
-  [ScriptContextState.Error]: Color.Red,
-};
+const partyFacingEventBits = [
+  [Direction.Up, EVENT_BIT_PARTY_FACING_UP],
+  [Direction.Right, EVENT_BIT_PARTY_FACING_RIGHT],
+  [Direction.Down, EVENT_BIT_PARTY_FACING_DOWN],
+  [Direction.Left, EVENT_BIT_PARTY_FACING_LEFT],
+];
+
+export enum SpritePriority {
+  UseTile = 0,
+  Upper = 1,
+  Lower = 2,
+  Both = 3,
+}
 
 export enum ObjectTypes {
   Camera,
@@ -65,11 +75,14 @@ export class MapObject {
   direction: Direction = Direction.Down;
   size = 0;
   eventAddress = 0;
-  scriptContext?: EventScriptContext;
   objectScriptContext?: ObjectScriptContext;
   paletteIndex = 0;
   graphics?: Graphics;
-  surface?: Surface;
+  lowSurface?: Surface;
+  highSurface?: Surface;
+  collision = true;
+  passable = false;
+  dirty = false;
 
   eventBit = 0;
   exists = false;
@@ -86,10 +99,17 @@ export class MapObject {
   subtileX = 0;
   y = 0;
   subtileY = 0;
+  movingToX?: number = undefined;
+  movingToY?: number = undefined;
 
   riding: RidingType = RidingType.None;
-
+  showRider = false;
   zLevel: ZLevel = ZLevel.Lower;
+
+  walkingFrame = 0;
+  animationStep = 0;
+
+  walkWhenMoving = true;
 
   get absX() {
     return this.x * 16 + this.subtileX * 16;
@@ -104,9 +124,37 @@ export class MapObject {
 
   map: MapEngine;
 
+  sprite: Sprite;
+  shape: Shape;
+  model!: Model;
+
+  priority: SpritePriority = SpritePriority.UseTile;
+
   constructor(map: MapEngine, index: number) {
     this.index = index;
     this.map = map;
+    this.sprite = new Sprite(map.spriteTileLayoutSlice, map.spriteAnimations);
+    this.shape = new Shape(
+      ShapeType.TriStrip,
+      null,
+      new VertexList([
+        { x: 0, y: 0, u: 0, v: 1 },
+        { x: 1, y: 0, u: 1, v: 1 },
+        { x: 0, y: 1, u: 0, v: 0 },
+        { x: 1, y: 1, u: 1, v: 0 },
+      ])
+    );
+    this.activeTileLayout = SpriteTileLayout.fromROM(Game.current.rom, 1);
+  }
+
+  async initialize() {
+    this.model = new Model(
+      [this.shape],
+      await new Shader({
+        fragmentFile: "@/assets/shaders/sprite/sprite.frag",
+        vertexFile: "@/assets/shaders/sprite/sprite.vert",
+      })
+    );
   }
 
   loadObjectScript(context: ObjectScriptContext) {
@@ -115,7 +163,7 @@ export class MapObject {
 
   loadPalette(palette: number) {
     this.paletteIndex = palette;
-    SSj.log(`NPC palette Index ${palette}`);
+    this.dirty = true;
   }
 
   loadGraphics(graphics: number) {
@@ -129,6 +177,7 @@ export class MapObject {
     );
     this.graphics.name = `Sprite Graphics #${hex(graphics, 2)}`;
     this.graphics.enablePaletteRendering();
+    this.dirty = true;
   }
 
   loadNpc(npc: NPCData) {
@@ -150,57 +199,116 @@ export class MapObject {
 
     this.eventBit = npc.eventBit;
     this.exists = true;
-    this.activeTileLayout = SpriteTileLayout.fromROM(Game.current.rom, 1);
+    this.visible = true;
 
-    this.render();
+    if (this.eventBit) {
+      const bit = Game.current.journal.getEventBit(this.eventBit);
+
+      if (!bit) {
+        this.exists = false;
+        this.visible = false;
+      }
+    }
+
+    this.dirty = true;
   }
 
   loadSprite(index: number) {
     this.loadGraphics(index);
 
-    this.activeTileLayout = SpriteTileLayout.fromROM(Game.current.rom, 1);
+    this.dirty = true;
   }
 
   getRenderOffset() {
     // return this.size === 16 ? 16 : 32;
-    return this.riding === RidingType.None ? 16 : 32;
+    return this.riding === RidingType.None ? 16 : 24;
   }
 
   render() {
-    if (!this.graphics || !this.activeTileLayout || !this.map.paletteSet) {
+    if (!this.graphics || !this.map.paletteSet) {
       return;
     }
 
-    if (!this.surface) {
-      this.surface = new Surface(16, 24, Color.Transparent);
+    if (!this.lowSurface || !this.highSurface) {
+      this.lowSurface = new Surface(16, 24, Color.Transparent);
+      this.lowSurface.blendOp = BlendOp.Replace;
+      this.highSurface = new Surface(16, 24, Color.Transparent);
+      this.highSurface.blendOp = BlendOp.Replace;
     }
 
-    this.surface.blendOp = BlendOp.Replace;
-    this.surface.clear(Color.Transparent);
+    this.lowSurface.clear(Color.Transparent);
+    this.highSurface.clear(Color.Transparent);
+
+    const thisTileProperties = this.map.getTileProperties(
+      this.movingToX === undefined ? this.x : this.movingToX,
+      this.movingToY === undefined ? this.y : this.movingToY
+    );
 
     if (this.size === 32) {
-      SSj.log("Size 32 sprite is not implemented");
+      // SSj.log("Size 32 sprite is not implemented");
       // return;
     }
 
-    // const rows = this.size === 16 ? 3 : 4;
-    // const columns = this.size === 16 ? 2 : 4;
-    const rows = 3;
-    const columns = 2;
-
-    for (let x = 0; x < columns; x++) {
-      for (let y = 0; y < rows; y++) {
-        const tileIndex = this.activeTileLayout.getTile(x + y * columns);
-        this.graphics.drawTile(
-          this.surface,
-          tileIndex,
-          x * 8,
-          y * 8,
-          this.map.paletteSet,
-          this.map.paletteSet.colorsPerPalette * (8 + this.paletteIndex)
-        );
-      }
+    let animation, frame;
+    switch (this.state) {
+      case ObjectState.Moving:
+        animation =
+          thisTileProperties & TileProperties.AlwaysFaceUp &&
+          thisTileProperties !== TileProperties.Impassable
+            ? SpriteAnimationType.WalkingUp
+            : this.getWalkingAnimationForDirection(this.movingDirection);
+        frame = this.walkingFrame;
+        break;
+      case ObjectState.Stationary:
+        animation = this.getStandingAnimationForDirection(this.direction);
+        frame = 0;
+        break;
     }
+
+    let bottomPriority, topPriority;
+
+    switch (this.priority) {
+      case SpritePriority.UseTile:
+        bottomPriority =
+          (this.zLevel === ZLevel.Upper &&
+            thisTileProperties & TileProperties.BridgeTile) ||
+          (!this.riding &&
+            thisTileProperties & TileProperties.BottomSpritePriority);
+        topPriority =
+          (this.zLevel === ZLevel.Upper &&
+            thisTileProperties & TileProperties.BridgeTile) ||
+          (!this.riding &&
+            thisTileProperties & TileProperties.TopSpritePriority);
+        break;
+      case SpritePriority.Lower:
+        bottomPriority = true;
+        topPriority = false;
+        break;
+      case SpritePriority.Upper:
+        bottomPriority = false;
+        topPriority = true;
+        break;
+      case SpritePriority.Both:
+        bottomPriority = topPriority = true;
+        break;
+    }
+
+    const topSurface = topPriority ? this.highSurface : this.lowSurface;
+    const bottomSurface = bottomPriority ? this.highSurface : this.lowSurface;
+
+    this.sprite.draw(
+      topSurface,
+      bottomSurface,
+      0,
+      0,
+      this.sprite.animations[animation],
+      frame,
+      this.graphics,
+      this.map.paletteSet,
+      this.map.paletteSet.colorsPerPalette * (8 + this.paletteIndex)
+    );
+
+    this.dirty = false;
   }
 
   move(direction: Direction, tiles: number): Promise<void> {
@@ -208,10 +316,29 @@ export class MapObject {
 
     this.state = ObjectState.Moving;
     this.movingDirection = direction;
+    this.direction = direction;
     this.movingTiles = tiles;
     const time = (1 / tilesPerSecondMap[this.speed]) * 60;
     this.movingEnd = now + time;
     this.movingDelta = 1 / time;
+    this.direction = direction;
+    this.dirty = true;
+
+    const [facingX, facingY] = this.getFacingTile();
+    const tile = this.map.getTileProperties(facingX, facingY);
+
+    if (this.isPlayerControlled()) {
+      for (const [dir, bit] of partyFacingEventBits) {
+        Game.current.journal.setEventBit(bit, dir === direction);
+      }
+
+      if (tile & TileProperties.DoorTile) {
+        this.map.openDoor(facingX, facingY);
+      }
+    }
+
+    this.movingToX = facingX;
+    this.movingToY = facingY;
 
     return new Promise((res, rej) => {
       this.resolveMoving = res;
@@ -224,6 +351,9 @@ export class MapObject {
     this.y = y;
     this.subtileX = 0;
     this.subtileY = 0;
+    this.movingToX = undefined;
+    this.movingToY = undefined;
+    this.dirty = true;
   }
 
   update() {
@@ -232,10 +362,15 @@ export class MapObject {
     switch (this.state) {
       case ObjectState.Moving: {
         let movedFullTile = false;
+        let walkProgress, walkStep;
 
         switch (this.movingDirection) {
           case Direction.Up:
-            this.subtileY = Math.max(-1, this.subtileY - this.movingDelta);
+            walkProgress = this.subtileY = Math.max(
+              -1,
+              this.subtileY - this.movingDelta
+            );
+            walkStep = this.y;
 
             if (now >= this.movingEnd) {
               this.y--;
@@ -244,7 +379,11 @@ export class MapObject {
 
             break;
           case Direction.Down:
-            this.subtileY = Math.min(1, this.subtileY + this.movingDelta);
+            walkProgress = this.subtileY = Math.min(
+              1,
+              this.subtileY + this.movingDelta
+            );
+            walkStep = this.y;
 
             if (now >= this.movingEnd) {
               this.y++;
@@ -253,7 +392,11 @@ export class MapObject {
 
             break;
           case Direction.Left:
-            this.subtileX = Math.max(-1, this.subtileX - this.movingDelta);
+            walkProgress = this.subtileX = Math.max(
+              -1,
+              this.subtileX - this.movingDelta
+            );
+            walkStep = this.x;
 
             if (now >= this.movingEnd) {
               this.x--;
@@ -262,7 +405,11 @@ export class MapObject {
 
             break;
           case Direction.Right:
-            this.subtileX = Math.min(1, this.subtileX + this.movingDelta);
+            walkProgress = this.subtileX = Math.min(
+              1,
+              this.subtileX + this.movingDelta
+            );
+            walkStep = this.x;
 
             if (now >= this.movingEnd) {
               this.x++;
@@ -272,28 +419,49 @@ export class MapObject {
             break;
         }
 
+        const oldFrame = this.walkingFrame;
+        this.walkingFrame = this.walkWhenMoving
+          ? ((walkStep & 1) << 1) | (Math.round(Math.abs(walkProgress * 2)) & 1)
+          : 0;
+
+        if (this.walkingFrame !== oldFrame) {
+          this.dirty = true;
+        }
+
         if (movedFullTile) {
           this.subtileY = 0;
           this.subtileX = 0;
+          this.movingToX = undefined;
+          this.movingToY = undefined;
           this.movingTiles--;
 
           if (!this.movingTiles) {
-            this.state = ObjectState.Stationary;
+            this.dirty = true;
+
             this.resolveMoving?.();
 
-            if (this.index === 0 && Game.current.playerCanMove()) {
+            Dispatch.now(() => (this.state = ObjectState.Stationary));
+
+            if (this.isPlayerControlled() && Game.current.playerCanMove()) {
               const trigger = this.map.getTriggerAt(this.x, this.y);
 
               if (trigger) {
-                SSj.log("HIT TRIGGER!");
-                SSj.log(
-                  `Starting event execution at ${hex(trigger.eventPointer, 6)}`
-                );
-                this.map.clearMovementKeys();
-                Game.current.scriptEngine.currentScript = Game.current.createScriptContext(
-                  trigger.eventPointer
-                );
+                Game.current.scriptEngine.run(trigger.eventPointer);
                 Game.current.scriptEngine.step();
+
+                if (
+                  Game.current.scriptEngine.currentScript?.isFinished() ===
+                  false
+                ) {
+                  this.map.clearMovementKeys();
+                }
+              }
+
+              const exit = this.map.getExitAt(this.x, this.y);
+
+              if (exit) {
+                this.map.clearMovementKeys();
+                this.map.exit(exit);
               }
             }
           } else {
@@ -319,20 +487,197 @@ export class MapObject {
     this.state = ObjectState.Stationary;
     this.subtileX = 0;
     this.subtileY = 0;
+    this.movingToX = undefined;
+    this.movingToY = undefined;
+
+    this.dirty = true;
   }
 
-  draw(target: Surface) {
-    // const xOffset = cameraX - target.width / 2 + 8;
-    // const yOffset = cameraY - target.height / 2;
-
-    // const x = -xOffset + this.absX;
-    // const y = -yOffset + this.absY - this.getRenderOffset();
+  draw(lowTarget: Surface, highTarget: Surface) {
+    if (this.dirty) {
+      this.render();
+    }
 
     const x = this.absX;
     const y = this.absY - this.getRenderOffset();
 
-    if (this.exists && this.visible && this.surface) {
-      Prim.blit(target, x, y, this.surface);
+    if (this.exists && this.visible && this.lowSurface && this.highSurface) {
+      this.shape.texture = this.lowSurface;
+      this.model.transform.identity().scale(16, 24).translate(x, y);
+      this.model.draw(lowTarget);
+
+      this.shape.texture = this.highSurface;
+      this.model.transform.identity().scale(16, 24).translate(x, y);
+      this.model.draw(highTarget);
     }
+  }
+
+  look(direction: Direction) {
+    this.direction = direction;
+    this.dirty = true;
+
+    if (this.isPlayerControlled()) {
+      for (const [dir, bit] of partyFacingEventBits) {
+        Game.current.journal.setEventBit(bit, dir === direction);
+      }
+    }
+  }
+
+  getWalkingAnimationForDirection(direction: Direction) {
+    switch (direction) {
+      case Direction.Up:
+        return SpriteAnimationType.WalkingUp;
+
+      case Direction.Right:
+        return SpriteAnimationType.WalkingRight;
+
+      case Direction.Down:
+        return SpriteAnimationType.WalkingDown;
+
+      case Direction.Left:
+        return SpriteAnimationType.WalkingLeft;
+    }
+  }
+
+  getStandingAnimationForDirection(direction: Direction) {
+    switch (direction) {
+      case Direction.Up:
+        return SpriteAnimationType.StandingUp;
+
+      case Direction.Right:
+        return SpriteAnimationType.StandingRight;
+
+      case Direction.Down:
+        return SpriteAnimationType.StandingDown;
+
+      case Direction.Left:
+        return SpriteAnimationType.StandingLeft;
+    }
+  }
+
+  canMove(direction: Direction, isRandomlyDirected = false) {
+    if (!this.collision) {
+      return true;
+    }
+
+    const [x, y] = this.getFacingTile(direction);
+
+    const bg1 = this.map.layers[LayerType.BG1];
+    if (y >= bg1.height || y < 0 || x >= bg1.width || x < 0) {
+      return false;
+    }
+
+    const properties = this.map.getTileProperties(x, y);
+
+    if (properties === 0xfff7) {
+      return false;
+    }
+
+    const isNPC = this.index !== 0;
+
+    if (direction === Direction.Up) {
+      if (!(properties & TileProperties.PassableThroughBottom)) {
+        return false;
+      }
+    } else if (direction === Direction.Right) {
+      if (!(properties & TileProperties.PassableThroughLeft)) {
+        return false;
+      }
+    } else if (direction === Direction.Down) {
+      if (!(properties & TileProperties.PassableThroughTop)) {
+        return false;
+      }
+    } else if (direction === Direction.Left) {
+      if (!(properties & TileProperties.PassableThroughRight)) {
+        return false;
+      }
+    }
+
+    if (!this.passable) {
+      for (const object of this.map.objects) {
+        if (
+          object.visible &&
+          object.exists &&
+          object.collision &&
+          !object.passable
+        ) {
+          if (
+            (object.x === x && object.y === y) ||
+            (object.movingToX === x && object.movingToY === y)
+          ) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  getFacingTile(direction?: Direction, x: number = this.x, y: number = this.y) {
+    switch (direction === undefined ? this.direction : direction) {
+      case Direction.Up:
+        return [x, y - 1];
+      case Direction.Right:
+        return [x + 1, y];
+      case Direction.Down:
+        return [x, y + 1];
+      case Direction.Left:
+        return [x - 1, y];
+    }
+  }
+
+  initiateInteraction() {
+    const [x, y] = this.getFacingTile();
+    let object = this.map.getObjectAt(x, y);
+
+    if (!object) {
+      const properties = this.map.getTileProperties(x, y);
+      if (properties === TileProperties.ThroughTile) {
+        const [nx, ny] = this.getFacingTile(this.direction, x, y);
+        object = this.map.getObjectAt(nx, ny);
+      }
+    }
+
+    if (!object || !object.exists || !object.eventAddress) {
+      return;
+    }
+
+    Game.current.scriptEngine.run(object.eventAddress);
+  }
+
+  isPlayerControlled() {
+    return this.index === Game.current.journal.party[0];
+  }
+
+  setZLevel(z: number) {
+    this.zLevel = z;
+    this.dirty = true;
+  }
+
+  setVisible(visible: boolean) {
+    this.visible = visible;
+    this.dirty = true;
+  }
+
+  setWalkWhenMoving(walk: boolean) {
+    this.walkWhenMoving = walk;
+    this.dirty = true;
+  }
+
+  setRiding(riding: RidingType, showRider: boolean) {
+    this.riding = riding;
+    this.showRider = showRider;
+    this.dirty = true;
+  }
+
+  setPriority(priority: SpritePriority) {
+    this.priority = priority;
+    this.dirty = true;
+  }
+
+  setExists(exists: boolean) {
+    this.exists = exists;
+    this.dirty = true;
   }
 }

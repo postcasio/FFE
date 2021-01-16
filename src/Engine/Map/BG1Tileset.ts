@@ -75,7 +75,7 @@ export class BG1Tileset implements Tileset {
   }
 
   drawTile(
-    target: Surface | null,
+    lowPriorityTarget: Surface | null,
     highPriorityTarget: Surface | null,
     index: number,
     x: number,
@@ -92,7 +92,7 @@ export class BG1Tileset implements Tileset {
       const subtile = tile.subtiles[i];
 
       if (subtile.priority && !highPriorityTarget) continue;
-      if (!subtile.priority && !target) continue;
+      if (!subtile.priority && !lowPriorityTarget) continue;
 
       const index = subtile.index;
 
@@ -102,7 +102,7 @@ export class BG1Tileset implements Tileset {
         index < 640 + this.animatedTileset.tiles.length * 4
       ) {
         this.animatedTileset.drawTile(
-          subtile.priority ? highPriorityTarget! : target!,
+          subtile.priority ? highPriorityTarget! : lowPriorityTarget!,
           index - 640,
           x + (i === 1 || i === 3 ? 8 : 0),
           y + (i === 2 || i === 3 ? 8 : 0),
@@ -112,8 +112,11 @@ export class BG1Tileset implements Tileset {
           subtile.inverted
         );
       } else {
+        const target = subtile.priority
+          ? highPriorityTarget!
+          : lowPriorityTarget!;
         this.graphics.drawTile(
-          subtile.priority ? highPriorityTarget! : target!,
+          target,
           index,
           x + (i === 1 || i === 3 ? 8 : 0),
           y + (i === 2 || i === 3 ? 8 : 0),

@@ -10,9 +10,13 @@ import { FadingDirection } from "./Engine/Fader";
 import {
   OBJECT_ID_CAMERA,
   OBJECT_ID_CHAR0,
+  OBJECT_ID_CHAR1,
+  OBJECT_ID_PARTY1,
   ZLevel,
 } from "./Engine/Map/MapObject";
 import Prim from "prim";
+import { Speed } from "./Engine/Map/NPCData";
+import { RidingType } from "./Engine/Script/RidingType";
 
 const ROM_PATH = "@/assets/roms/ff3u.sfc";
 
@@ -47,23 +51,25 @@ export default class FFE extends Thread {
     await game.init();
 
     // Load 'darkness' map
-    game.mapEngine.loadMap(3);
+    // game.mapEngine.loadMap(3);
+    // game.scriptEngine.run(0x0003);
 
-    // game.mapEngine.loadMap(190);
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].zLevel = ZLevel.Lower;
-    // game.journal.setPartyMembers([0x00, 0xff, 0xff, 0xff]);
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].exists = true;
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].visible = true;
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].loadPalette(0);
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].loadSprite(4);
-    // game.mapEngine.cameraLocked = false;
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].x = 22;
-    // game.mapEngine.objects[OBJECT_ID_CHAR0].y = 8;
-    // game.mapEngine.updateCamera(true);
-    // game.fader.fade(FadingDirection.In, 2);
-
-    // Load game start script. This will trigger the title scene.
-    game.scriptEngine.currentScript = game.createScriptContext(0x0003);
+    game.mapEngine.loadMap(50);
+    game.mapEngine.cameraLocked = false;
+    game.journal.setPartyMembers([0x00]);
+    const object = game.mapEngine.getObject(OBJECT_ID_PARTY1)!;
+    object.zLevel = ZLevel.Lower;
+    object.exists = true;
+    object.visible = true;
+    object.loadPalette(2);
+    object.loadSprite(0);
+    object.x = 55;
+    object.y = 12;
+    object.collision = true;
+    object.speed = Speed.Normal;
+    game.mapEngine.updateCamera(true);
+    game.mapEngine.refreshObjects();
+    game.fader.fade(FadingDirection.In, 2);
 
     Dispatch.onRender(() => {
       game.render();

@@ -3,6 +3,7 @@ import { decodeLZSS } from "./LZSS";
 import {
   hirom,
   ROM_COLOR_MATH_SIZE,
+  ROM_FIXED_WIDTH_FONT_GRAPHICS_SIZE,
   ROM_MAP_CHARACTER_PALETTE_SIZE,
   ROM_MAP_PALETTE_ANIMATION_SIZE,
   ROM_MAP_PALETTE_SIZE,
@@ -16,9 +17,11 @@ import {
   ROM_OFFSET_ANIMATED_TILESET_POINTER_LIST,
   ROM_OFFSET_BG3_GRAPHICS,
   ROM_OFFSET_BG3_GRAPHIC_POINTER_LIST,
+  ROM_OFFSET_CHARACTER_NAMES,
   ROM_OFFSET_CHARACTER_PALETTES,
   ROM_OFFSET_COLOR_MATH,
   ROM_OFFSET_FIELD_SPRITES_GRAPHICS,
+  ROM_OFFSET_FIXED_WIDTH_FONT_GRAPHICS,
   ROM_OFFSET_HEADER,
   ROM_OFFSET_LOCATION_LIST,
   ROM_OFFSET_LOCATION_NAMES,
@@ -30,12 +33,17 @@ import {
   ROM_OFFSET_MAP_PALETTE_ANIMATIONS,
   ROM_OFFSET_MAP_PALETTE_ANIMATION_PALETTES,
   ROM_OFFSET_MAP_PARALLAX,
+  ROM_OFFSET_MAP_TILE_PROPERTIES,
+  ROM_OFFSET_MAP_TILE_PROPERTIES_POINTER_LIST,
   ROM_OFFSET_MAP_TRIGGERS,
   ROM_OFFSET_MAP_TRIGGER_POINTER_LIST,
+  ROM_OFFSET_MULTI_TILE_EXIT_POINTER_LIST,
   ROM_OFFSET_NPCS,
   ROM_OFFSET_NPC_POINTER_LIST,
+  ROM_OFFSET_SINGLE_TILE_EXIT_POINTER_LIST,
   ROM_OFFSET_SPRITES_POINTER_LIST_HI,
   ROM_OFFSET_SPRITES_POINTER_LIST_LO,
+  ROM_OFFSET_SPRITE_ANIM_VEHICLE_MOVEMENT,
   ROM_OFFSET_SPRITE_TILE_FORMATIONS,
   ROM_OFFSET_TILEMAPS,
   ROM_OFFSET_TILEMAP_POINTER_LIST,
@@ -105,6 +113,7 @@ export class ROM {
 
   tables = {
     primary: Table.fromFile("@/assets/tables/ff3us.tbl"),
+    battle: Table.fromFile("@/assets/tables/ff3us_battle.tbl"),
   };
 
   buffer: ArrayBuffer;
@@ -198,6 +207,17 @@ export class ROM {
       this.getArraySlice(
         ROM_OFFSET_VARIABLE_WIDTH_FONT,
         ROM_OFFSET_VARIABLE_WIDTH_FONT + 256
+      )
+    );
+  }
+
+  getFixedWidthFontGraphicsSlice() {
+    return new Slice(
+      ROM_OFFSET_FIXED_WIDTH_FONT_GRAPHICS,
+      this.getArraySlice(
+        ROM_OFFSET_FIXED_WIDTH_FONT_GRAPHICS,
+        ROM_OFFSET_FIXED_WIDTH_FONT_GRAPHICS +
+          ROM_FIXED_WIDTH_FONT_GRAPHICS_SIZE
       )
     );
   }
@@ -523,5 +543,80 @@ export class ROM {
     const offset = ROM_OFFSET_MAP_TRIGGERS + pointer;
     const next = ROM_OFFSET_MAP_TRIGGERS + nextPointer;
     return new Slice(offset, this.getArraySlice(offset, next));
+  }
+
+  getMovementAnimationSlice() {
+    return new Slice(
+      ROM_OFFSET_SPRITE_ANIM_VEHICLE_MOVEMENT,
+      this.getArraySlice(
+        ROM_OFFSET_SPRITE_ANIM_VEHICLE_MOVEMENT,
+        ROM_OFFSET_SPRITE_ANIM_VEHICLE_MOVEMENT + 44
+      )
+    );
+  }
+
+  getSpriteTileLayoutSlice() {
+    return new Slice(
+      ROM_OFFSET_SPRITE_TILE_FORMATIONS,
+      this.getArraySlice(
+        ROM_OFFSET_SPRITE_TILE_FORMATIONS,
+        ROM_OFFSET_SPRITE_TILE_FORMATIONS + 12 * 58
+      )
+    );
+  }
+
+  getTilePropertiesSlice(index: number) {
+    const pointerOffset =
+      ROM_OFFSET_MAP_TILE_PROPERTIES_POINTER_LIST + index * 2;
+    const pointer = this.getUint16(pointerOffset);
+    const offset = ROM_OFFSET_MAP_TILE_PROPERTIES + pointer;
+
+    const compressedLength = this.getUint16(offset);
+    const decoded = decodeLZSS(
+      this.getArraySlice(offset, offset + compressedLength)
+    );
+
+    if (decoded.compressedLength !== compressedLength) {
+      SSj.log(
+        `WARN: Decoded compressed length ${decoded.compressedLength} is not expected ${compressedLength}`
+      );
+    }
+
+    return new Slice(offset, decoded.data, compressedLength);
+  }
+
+  getSingleTileExitsSlice(index: number) {
+    const pointerOffset = ROM_OFFSET_SINGLE_TILE_EXIT_POINTER_LIST + index * 2;
+    const nextPointerOffset =
+      ROM_OFFSET_SINGLE_TILE_EXIT_POINTER_LIST + (index + 1) * 2;
+    const pointer = this.getUint16(pointerOffset);
+    const nextPointer = this.getUint16(nextPointerOffset);
+    const offset = pointer + ROM_OFFSET_SINGLE_TILE_EXIT_POINTER_LIST;
+    const nextOffset = nextPointer + ROM_OFFSET_SINGLE_TILE_EXIT_POINTER_LIST;
+    return new Slice(offset, this.getArraySlice(offset, nextOffset));
+  }
+
+  getMultiTileExitsSlice(index: number) {
+    const pointerOffset = ROM_OFFSET_MULTI_TILE_EXIT_POINTER_LIST + index * 2;
+    const nextPointerOffset =
+      ROM_OFFSET_MULTI_TILE_EXIT_POINTER_LIST + (index + 1) * 2;
+    const pointer = this.getUint16(pointerOffset);
+    const nextPointer = this.getUint16(nextPointerOffset);
+    const offset = pointer + ROM_OFFSET_MULTI_TILE_EXIT_POINTER_LIST;
+    const nextOffset = nextPointer + ROM_OFFSET_MULTI_TILE_EXIT_POINTER_LIST;
+    return new Slice(offset, this.getArraySlice(offset, nextOffset));
+  }
+
+  getCharacterName(index: number) {
+    const offset = ROM_OFFSET_CHARACTER_NAMES + index * 6;
+
+    SSj.log(
+      `Get char name from offset ${hex(offset, 6)} = ${hex(
+        offset - hirom(0),
+        6
+      )}`
+    );
+
+    return this.getStringz(offset, 6, this.tables.battle).trim();
   }
 }

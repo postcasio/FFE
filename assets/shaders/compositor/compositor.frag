@@ -14,6 +14,7 @@ struct Layer {
 	bool subscreen;
 	bool mainscreen;
 	bool math;
+	bool tiles;
 };
 
 uniform Layer layers[8];
@@ -30,7 +31,10 @@ varying vec2 texcoords;
 uniform float math_sign;
 uniform float math_multiplier;
 
+uniform float pixelate;
+
 #define MAX_WAVY_DISPLACEMENT_Y 1.0
+#define PIXELATE_MAX_PIXEL_SIZE 64.0
 
 vec4 getLayerColor(int layer, vec2 uv) {
 	return texture2D(layers[layer].tex, uv);
@@ -49,7 +53,7 @@ vec2 apply_uv_modifiers(int layer) {
 	uv = fract(uv);
 
 	if (layers[layer].wavy_effect) {
-		float amplitudey = sin(t*2.0) * sin(texcoords.y * 76.0);
+		float amplitudey = sin(t*2.0) * sin(texcoords.y * 96.0);
 		// float amplitudey = sin(t / 20.0 + uv.y * 48.0);
 
 		vec2 displacement = vec2(
@@ -58,6 +62,15 @@ vec2 apply_uv_modifiers(int layer) {
 		);
 
 		uv -= displacement;
+	}
+
+	if (pixelate > 0.0 && layers[layer].tiles) {
+		vec2 pixelation = vec2(
+			mod(uv.x, pixelate * PIXELATE_MAX_PIXEL_SIZE / layer_sizes[layer].x),
+			mod(uv.y, pixelate * PIXELATE_MAX_PIXEL_SIZE / layer_sizes[layer].y)
+		);
+
+		uv -= pixelation;
 	}
 
 	return uv;

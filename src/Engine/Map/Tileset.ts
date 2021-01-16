@@ -11,7 +11,8 @@ export interface Tileset {
     index: number,
     x: number,
     y: number,
-    renderDynamic?: boolean
+    renderDynamic?: boolean,
+    replace?: boolean
   ): void;
   isDynamicTile(index: number): boolean;
   // getDynamicTileSpeed(index: number): number | null;

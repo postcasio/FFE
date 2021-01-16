@@ -17,11 +17,18 @@ import {
   MapObject,
   ObjectState,
   OBJECT_ID_CAMERA,
+  OBJECT_ID_CHAR0,
+  OBJECT_ID_PARTY1,
+  OBJECT_ID_PARTY2,
+  OBJECT_ID_PARTY3,
+  OBJECT_ID_PARTY4,
   ZLevel as ObjectZLevel,
 } from "./MapObject";
 import { MapProperties } from "./MapProperties";
 import { BG3Tileset } from "./BG3Tileset";
 import { Trigger } from "./Trigger";
+import { SpriteAnimation, SpriteAnimationType } from "./Sprite";
+import { FadingDirection } from "../Fader";
 
 export enum MathLayer {
   Layer1 = 1,
@@ -40,6 +47,106 @@ const blend = new BlendOp(
   Blend.One
 );
 
+const doorTiles: Record<number, number> = {
+  // two 1x2 doors
+  5: 4,
+  7: 6,
+
+  21: 20,
+  23: 22,
+
+  // one 3x2 door
+  11: 8,
+  12: 9,
+  13: 10,
+
+  27: 24,
+  28: 25,
+  29: 26,
+};
+
+export enum TileProperties {
+  PassableUpperZLevel = 0b0000_0000_0000_0001,
+  PassableLowerZLevel = 0b0000_0000_0000_0010,
+  PassableBothZlevels = 0b0000_0000_0000_0011,
+  BridgeTile = 0b0000_0000_0000_0100,
+  TopSpritePriority = 0b0000_0000_0000_1000,
+  BottomSpritePriority = 0b0000_0000_0001_0000,
+  DoorTile = 0b0000_0000_0010_0000,
+  UpLeftMovement = 0b0000_0000_0100_0000,
+  UpRightMovement = 0b0000_0000_1000_0000,
+  PassableThroughLeft = 0b0000_0001_0000_0000,
+  PassableThroughRight = 0b0000_0010_0000_0000,
+  PassableThroughBottom = 0b0000_0100_0000_0000,
+  PassableThroughTop = 0b0000_1000_0000_0000,
+  Unknown1 = 0b0001_0000_0000_0000,
+  Unknown2 = 0b0010_0000_0000_0000,
+  AlwaysFaceUp = 0b0100_0000_0000_0000,
+  PassableRandomly = 0b1000_0000_0000_0000,
+  Impassable = 0b1111_1111_1111_0111,
+  ThroughTile = 0b0000_0000_0000_0111,
+}
+
+class SingleTileExit {
+  x: number;
+  y: number;
+  map: number;
+  setParent: boolean;
+  zLevel: ObjectZLevel;
+  showMapName: boolean;
+  direction: Direction;
+  destinationX: number;
+  destinationY: number;
+
+  constructor(slice: Slice) {
+    this.x = slice.data[0];
+    this.y = slice.data[1];
+    this.map = (slice.data[2] | (slice.data[3] << 8)) & 0x1ff;
+    this.setParent = (slice.data[3] & 0x02) !== 0;
+    this.zLevel = (slice.data[3] & 0x04) >> 2;
+    this.showMapName = (slice.data[3] & 0x08) !== 0;
+    this.direction = (slice.data[3] & 0x30) >> 4;
+    this.destinationX = slice.data[4];
+    this.destinationY = slice.data[5];
+  }
+}
+
+class MultiTileExit {
+  x: number;
+  y: number;
+  map: number;
+  setParent: boolean;
+  zLevel: ObjectZLevel;
+  showMapName: boolean;
+  direction: Direction;
+  destinationX: number;
+  destinationY: number;
+  vertical: boolean;
+  length: number;
+
+  constructor(slice: Slice) {
+    this.x = slice.data[0];
+    this.y = slice.data[1];
+    this.length = slice.data[2] & 0x7f;
+    this.vertical = (slice.data[2] & 0x80) !== 0;
+    this.map = (slice.data[3] | (slice.data[4] << 8)) & 0x1ff;
+    this.setParent = (slice.data[4] & 0x02) !== 0;
+    this.zLevel = (slice.data[4] & 0x04) >> 2;
+    this.showMapName = (slice.data[4] & 0x08) !== 0;
+    this.direction = (slice.data[4] & 0x30) >> 4;
+    this.destinationX = slice.data[5];
+    this.destinationY = slice.data[6];
+  }
+}
+
+type Exit = SingleTileExit | MultiTileExit;
+
+interface OpenDoor {
+  x: number;
+  y: number;
+  tile: number;
+}
+
 export class MapEngine {
   name = "";
   index?: number;
@@ -53,9 +160,7 @@ export class MapEngine {
     [LayerType.BG3]: new BG12Layer(),
   };
 
-  objects: MapObject[] = new Array(64)
-    .fill(0)
-    .map((n, i) => new MapObject(this, i));
+  objects: MapObject[];
 
   background: Surface = new Surface(256, 224, Color.Black);
 
@@ -98,6 +203,26 @@ export class MapEngine {
   spriteLayerLow?: Surface;
   spriteLayerHigh?: Surface;
 
+  spriteAnimations: SpriteAnimation[] = [];
+  spriteTileLayoutSlice: Slice;
+
+  pixelate = 0;
+
+  tileProperties: TileProperties[] = [];
+
+  singleTileExits: SingleTileExit[] = [];
+  multiTileExits: MultiTileExit[] = [];
+
+  stopped = false;
+
+  openDoors: OpenDoor[] = [];
+
+  getTileProperties(x: number, y: number) {
+    const bg1 = this.layers[LayerType.BG1];
+    const tile = bg1.tiles[x + y * bg1.width];
+    return this.tileProperties[tile];
+  }
+
   constructor() {
     this.animatedGraphics = new Graphics(
       Game.current.rom.getAnimatedMapGraphicsSlice(),
@@ -108,6 +233,28 @@ export class MapEngine {
     );
     this.animatedGraphics.enablePaletteRendering();
     this.animatedGraphics.name = "Map Animated Graphics";
+
+    const movementAnimations = Game.current.rom.getMovementAnimationSlice();
+    for (let i = 0; i < 8; i++) {
+      this.spriteAnimations.push(
+        new SpriteAnimation(
+          i,
+          Array.from(movementAnimations.getArraySlice(i * 4, i * 4 + 4))
+        )
+      );
+    }
+    for (let i = 0; i < 4; i++) {
+      this.spriteAnimations.push(
+        new SpriteAnimation(
+          8 + i,
+          Array.from(movementAnimations.getArraySlice(32 + i, 33 + i))
+        )
+      );
+    }
+
+    this.spriteTileLayoutSlice = Game.current.rom.getSpriteTileLayoutSlice();
+    this.objects = new Array(64).fill(0).map((n, i) => new MapObject(this, i));
+    this.objects[OBJECT_ID_CAMERA].exists = true;
   }
 
   loadEmptyMap() {
@@ -124,7 +271,7 @@ export class MapEngine {
     this.paletteSet = undefined;
   }
 
-  loadMap(index: number) {
+  loadMap(index: number, runScripts = true) {
     this.index = index;
 
     if (index === 3) {
@@ -135,7 +282,23 @@ export class MapEngine {
       Game.current.rom.getMapPropertiesSlice(index)
     );
 
+    SSj.log(properties);
+
     this.name = Game.current.rom.getMapName(properties.mapNameIndex);
+
+    const tilePropertiesData = Game.current.rom.getTilePropertiesSlice(
+      properties.layer1.tilePropertiesIndex
+    ).data;
+
+    this.tileProperties = [];
+
+    const tilePropertiesCount = tilePropertiesData.length / 2;
+    for (let i = 0; i < tilePropertiesCount; i++) {
+      const value =
+        tilePropertiesData[i] |
+        (tilePropertiesData[tilePropertiesCount + i] << 8);
+      this.tileProperties.push(value);
+    }
 
     const graphicsBuffer = new Uint8Array(0xffff);
 
@@ -253,7 +416,7 @@ export class MapEngine {
     bg2.zLevels = [ZLevel.snes2L, ZLevel.snes2H];
 
     bg2.dirty = true;
-    SSj.log(properties.layer3);
+
     if (properties.layer3.layoutIndex) {
       bg3.tileset = new BG3Tileset(
         layer3Graphics,
@@ -307,9 +470,14 @@ export class MapEngine {
 
     this.loadNPCs(npcs);
 
-    this.scriptContext = Game.current.createScriptContext(
-      Game.current.rom.getMapEventPointer(index)
-    );
+    if (runScripts) {
+      this.scriptContext?.stop();
+      this.scriptContext = Game.current.createScriptContext(
+        Game.current.rom.getMapEventPointer(index)
+      );
+    } else {
+      this.scriptContext = undefined;
+    }
 
     const colorMath = Game.current.rom.getColorMathSlice(
       properties.colorMathIndex
@@ -324,8 +492,6 @@ export class MapEngine {
       subScreen: colorMath.data[2] & 0x3f,
     };
 
-    SSj.log(this.math);
-
     bg1.math = (this.math.mathLayers & MathLayer.Layer1) !== 0;
     bg2.math = (this.math.mathLayers & MathLayer.Layer2) !== 0;
     bg3.math = (this.math.mathLayers & MathLayer.Layer3) !== 0;
@@ -336,14 +502,8 @@ export class MapEngine {
     bg3.mainscreen = (this.math.mainScreen & MathLayer.Layer3) !== 0;
     bg3.subscreen = (this.math.subScreen & MathLayer.Layer3) !== 0;
 
-    this.mapWidth =
-      properties.mapWidth === 0
-        ? Math.max(...[bg1, bg2, bg3].map((layer) => layer.tileWidth))
-        : properties.mapWidth;
-    this.mapHeight =
-      properties.mapHeight === 0
-        ? Math.max(...[bg1, bg2, bg3].map((layer) => layer.tileHeight))
-        : properties.mapHeight;
+    this.mapWidth = properties.mapWidth === 0 ? 0 : properties.mapWidth;
+    this.mapHeight = properties.mapHeight === 0 ? 0 : properties.mapHeight;
 
     this.triggers = [];
 
@@ -355,17 +515,33 @@ export class MapEngine {
       this.triggers.push(new Trigger(triggers.slice(i * 5, (i + 1) * 5)));
     }
 
-    SSj.log(this.triggers);
+    this.singleTileExits = [];
+    this.multiTileExits = [];
+    const singleTileExitSlice = Game.current.rom.getSingleTileExitsSlice(index);
+    for (let i = 0; i < singleTileExitSlice.data.length / 6; i++) {
+      this.singleTileExits.push(
+        new SingleTileExit(singleTileExitSlice.slice(i * 6, (i + 1) * 6))
+      );
+    }
+    const multiTileExitSlice = Game.current.rom.getMultiTileExitsSlice(index);
+    for (let i = 0; i < multiTileExitSlice.data.length / 7; i++) {
+      SSj.log(multiTileExitSlice.slice(i * 7, (i + 1) * 7).data);
+      this.multiTileExits.push(
+        new MultiTileExit(multiTileExitSlice.slice(i * 7, (i + 1) * 7))
+      );
+    }
+
+    this.openDoors = [];
+
     this.update();
   }
 
   loadNPCs(npcs: NPCData[]) {
     let objectIndex = 0;
     while (objectIndex < 16) {
-      // if (objectIndex > 0) {
-      //   this.objects[objectIndex].exists = false;
-      //   this.objects[objectIndex].visible = false;
-      // }
+      if (objectIndex > 0) {
+        this.objects[objectIndex].setVisible(false);
+      }
       this.objects[objectIndex++].stop();
     }
 
@@ -373,22 +549,20 @@ export class MapEngine {
       const object = this.objects[objectIndex++];
 
       object.loadNpc(npc);
-
-      if (Game.current.journal.getEventBit(npc.eventBit)) {
-        object.visible = true;
-      } else {
-        object.visible = false;
-      }
     }
 
-    while (objectIndex < 48) {
+    while (objectIndex < 49) {
       this.objects[objectIndex].stop();
-      this.objects[objectIndex].exists = false;
-      this.objects[objectIndex++].visible = false;
+      this.objects[objectIndex].setExists(false);
+      this.objects[objectIndex++].setVisible(false);
     }
   }
 
   update() {
+    if (this.stopped) {
+      return;
+    }
+
     this.scriptContext?.stepUntilWaiting();
 
     for (const object of this.objects) {
@@ -399,13 +573,18 @@ export class MapEngine {
       object.update();
     }
 
-    const player = this.objects[0];
+    const player = this.getPlayerObject();
 
     if (
+      player &&
       player.state !== ObjectState.Moving &&
       this.directionInputsHeld.length
     ) {
-      player.move(this.directionInputsHeld[0], 1);
+      if (player.canMove(this.directionInputsHeld[0])) {
+        player.move(this.directionInputsHeld[0], 1);
+      } else {
+        player.look(this.directionInputsHeld[0]);
+      }
     }
 
     if (this.animatedPalette) {
@@ -419,9 +598,9 @@ export class MapEngine {
 
   updateCamera(force = false) {
     if (force || !this.cameraLocked) {
-      const cameraTracks = Game.current.journal.party[0];
+      const cameraTracks = Game.current.journal.getPointCharacter()?.index;
 
-      if (cameraTracks === 0xff) {
+      if (cameraTracks === undefined) {
         return;
       }
 
@@ -452,8 +631,10 @@ export class MapEngine {
     const shader = this.compositorModel.shader;
     if (!shader) return;
 
-    const cameraX = this.objects[OBJECT_ID_CAMERA].absX;
-    const cameraY = this.objects[OBJECT_ID_CAMERA].absY;
+    const [cameraX, cameraY] = this.getCameraPosition(
+      target.width,
+      target.height
+    );
 
     if (
       !this.spriteLayerLow ||
@@ -467,6 +648,7 @@ export class MapEngine {
         bg1.lowSurface.width,
         bg1.lowSurface.height
       );
+
       this.spriteLayerHigh = new Surface(
         bg2.lowSurface.width,
         bg2.lowSurface.height
@@ -476,16 +658,11 @@ export class MapEngine {
     this.spriteLayerLow.clear(Color.Transparent);
     this.spriteLayerHigh.clear(Color.Transparent);
 
-    for (const object of this.objects) {
-      switch (object.zLevel) {
-        case ObjectZLevel.Lower:
-          object.draw(this.spriteLayerLow);
-          break;
-        case ObjectZLevel.Upper:
-          object.draw(this.spriteLayerHigh);
-          break;
-      }
+    for (const object of [...this.objects].sort(this.objectSort)) {
+      object.draw(this.spriteLayerLow, this.spriteLayerHigh);
     }
+
+    shader.setFloat("pixelate", this.pixelate);
     shader.setSampler("palette", this.paletteSet.getTexture(), 2);
     shader.setFloat("t", Sphere.now() / 10);
     shader.setFloatVector("output_size", [target.width, target.height]);
@@ -503,7 +680,7 @@ export class MapEngine {
       [true, bg3, bg3.lowSurface, bg3.zLevels[0]],
       [true, bg3, bg3.highSurface, bg3.zLevels[1]],
       [false, bg1, this.spriteLayerLow, ZLevel.snesS2],
-      [false, bg2, this.spriteLayerHigh, ZLevel.snesS3],
+      [false, bg1, this.spriteLayerHigh, ZLevel.snesS3],
     ];
     // log: [[{},11],[{},15],[{},10],[{},14],[{},3],[{},17]]
     // SSj.log(layerOrder.map((l) => l.slice(1)));
@@ -511,22 +688,17 @@ export class MapEngine {
     for (let i = 0; i < 8; i++) {
       const [tileLayer, layer, surface, zLevel] = layerOrder[i];
 
-      const xOffset =
-        cameraX / layer.parallaxMultiplierX +
-        layer.scrollPositionX +
-        layer.shiftX * 16 -
-        target.width / 2 +
-        8;
-      const yOffset =
-        cameraY / layer.parallaxMultiplierY +
-        layer.scrollPositionY +
-        layer.shiftY * 16 -
-        target.height / 2;
+      const [xOffset, yOffset] = layer.getOffset(
+        cameraX,
+        cameraY,
+        target.width,
+        target.height
+      );
 
       if (tileLayer) {
         layer.frameRender(0, 0, target.width, target.height, xOffset, yOffset);
       }
-
+      shader.setBoolean(`layers[${i}].tiles`, tileLayer);
       shader.setSampler(`layers[${i}].tex`, surface, 2 + i);
       shader.setFloatVector(`layers[${i}].size`, [
         surface.width,
@@ -574,9 +746,13 @@ export class MapEngine {
     this.compositorModel.draw(target);
   }
 
+  objectSort(a: MapObject, b: MapObject) {
+    return a.y < b.y ? -1 : 1;
+  }
+
   refreshObjects() {
     for (const object of this.objects) {
-      object.render();
+      object.dirty = true;
     }
   }
 
@@ -605,10 +781,13 @@ export class MapEngine {
     for (const layer of Object.values(this.layers)) {
       await layer.initialize();
     }
+
+    for (const object of this.objects) {
+      await object.initialize();
+    }
   }
 
   acceptInput(input: InputMapping) {
-    SSj.log(input);
     let direction;
 
     switch (input.intent) {
@@ -624,6 +803,9 @@ export class MapEngine {
       case Intent.Right:
         direction = Direction.Right;
         break;
+      case Intent.Accept:
+        this.getPlayerObject()?.initiateInteraction();
+        return;
       default:
         return;
     }
@@ -649,6 +831,7 @@ export class MapEngine {
   getTriggerAt(x: number, y: number) {
     for (const trigger of this.triggers) {
       if (trigger.x === x && trigger.y === y) {
+        SSj.log(this.triggers);
         return trigger;
       }
     }
@@ -658,5 +841,143 @@ export class MapEngine {
 
   clearMovementKeys() {
     this.directionInputsHeld = [];
+  }
+
+  getObjectAt(x: number, y: number) {
+    for (const object of this.objects) {
+      if (object.exists && object.x === x && object.y === y) {
+        return object;
+      }
+    }
+
+    return undefined;
+  }
+
+  getSingleTileExitAt(x: number, y: number) {
+    for (const exit of this.singleTileExits) {
+      if (exit.x === x && exit.y === y) {
+        return exit;
+      }
+    }
+
+    return undefined;
+  }
+
+  getMultiTileExitAt(x: number, y: number) {
+    for (const exit of this.multiTileExits) {
+      if (
+        (exit.vertical &&
+          x === exit.x &&
+          x >= exit.y &&
+          x < exit.y + exit.length) ||
+        (!exit.vertical &&
+          y === exit.y &&
+          x >= exit.x &&
+          x < exit.x + exit.length)
+      ) {
+        return exit;
+      }
+    }
+
+    return undefined;
+  }
+
+  getExitAt(x: number, y: number) {
+    return this.getSingleTileExitAt(x, y) || this.getMultiTileExitAt(x, y);
+  }
+
+  async exit(exit: Exit) {
+    SSj.log(exit);
+    this.stop();
+    await Game.current.fader.fade(FadingDirection.Out, 8);
+    this.loadMap(exit.map);
+    const object = this.getObject(OBJECT_ID_PARTY1);
+    if (object) {
+      object.setPosition(exit.destinationX, exit.destinationY);
+      object.look(exit.direction);
+      object.zLevel = exit.zLevel;
+    }
+    this.updateCamera();
+    this.start();
+    await Game.current.fader.fade(FadingDirection.In, 8);
+  }
+
+  stop() {
+    this.stopped = true;
+  }
+
+  start() {
+    this.stopped = false;
+  }
+
+  openDoor(x: number, y: number) {
+    for (let dy = y - 1; dy <= y; dy++) {
+      for (let dx = x - 1; dx <= x + 1; dx++) {
+        const tile = this.layers[LayerType.BG1].getTileAt(dx, dy);
+        if (doorTiles[tile]) {
+          this.layers[LayerType.BG1].setTile(dx, dy, doorTiles[tile]);
+          this.openDoors.push({ x: dx, y: dy, tile });
+        }
+      }
+    }
+
+    this.layers[LayerType.BG1].renderArea(x - 1, y - 1, 3, 2);
+  }
+
+  getObject(index: number) {
+    switch (index) {
+      case OBJECT_ID_PARTY1:
+      case OBJECT_ID_PARTY2:
+      case OBJECT_ID_PARTY3:
+      case OBJECT_ID_PARTY4: {
+        const indexInParty = index - OBJECT_ID_PARTY1;
+        const partyMember = Game.current.journal.getCharacterInParty(
+          indexInParty
+        );
+        return partyMember !== undefined
+          ? this.objects[partyMember]
+          : undefined;
+      }
+      default:
+        return this.objects[index];
+    }
+  }
+
+  getPlayerObject() {
+    return this.getObject(OBJECT_ID_PARTY1);
+  }
+
+  refreshLayers() {
+    for (const layer of Object.values(this.layers)) {
+      layer.applyPendingModifications();
+    }
+  }
+
+  getCamera() {
+    return this.objects[OBJECT_ID_CAMERA];
+  }
+
+  getCameraPosition(targetW: number, targetH: number) {
+    const halfScreenWidth = targetW / 2;
+    const halfScreenHeight = targetH / 2;
+    const mapWidth = this.mapWidth * 16;
+    const mapHeight = this.mapHeight * 16;
+
+    const cameraX =
+      this.mapWidth > 0
+        ? Math.min(
+            Math.max(this.objects[OBJECT_ID_CAMERA].absX, halfScreenWidth),
+            mapWidth - halfScreenWidth
+          )
+        : this.objects[OBJECT_ID_CAMERA].absX;
+    const cameraY =
+      this.mapHeight > 0
+        ? Math.min(
+            Math.max(this.objects[OBJECT_ID_CAMERA].absY, halfScreenHeight),
+            mapHeight - halfScreenHeight
+          )
+        : this.objects[OBJECT_ID_CAMERA].absY;
+
+    return [cameraX, cameraY];
   }
 }

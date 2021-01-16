@@ -11,5 +11,5 @@ export function instr_42_hide_object({
 
   context.disasm("hide_object", `#$${hex(object, 2)}`);
 
-  game.mapEngine.objects[object].visible = false;
+  game.mapEngine.getObject(object)?.setVisible(false);
 }

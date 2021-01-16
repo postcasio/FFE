@@ -9,8 +9,11 @@ import { ObjectInstructionHandlerArguments } from "../ObjectInstructionSet";
 export function instr_Cx_set_direction({
   stream,
   context,
+  payload: { object },
 }: ObjectInstructionHandlerArguments) {
   const instr = stream.next8();
 
   context.disasm("set_direction", `@${Direction[instr & 0x3].toLowerCase()}`);
+
+  object.look(instr & 0x3);
 }

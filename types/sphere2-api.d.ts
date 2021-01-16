@@ -1791,6 +1791,8 @@ declare class Surface extends Texture {
   /** Blending operation to use when rendering to this surface. */
   blendOp: BlendOp;
 
+  depthOp: DepthOp;
+
   /** Height of the surface, in pixels. */
   readonly height: number;
 
@@ -3205,3 +3207,64 @@ declare module "tween" {
     easeOut(newValues: Partial<T>, numFrames: number): Promise<void>;
   }
 }
+
+declare enum DepthOp {
+  AlwaysPass,
+  NeverPass,
+  Equal,
+  Greater,
+  GreatOrEqual,
+  Less,
+  LessOrEqual,
+  NotEqual,
+}
+
+interface NodeRequireFunction {
+  (id: string): any;
+}
+
+interface NodeRequire extends NodeRequireFunction {
+  resolve: RequireResolve;
+  cache: any;
+  /**
+   * @deprecated
+   */
+  extensions: NodeExtensions;
+  main: NodeModule | undefined;
+}
+
+interface RequireResolve {
+  (id: string, options?: { paths?: string[] }): string;
+  paths(request: string): string[] | null;
+}
+
+interface NodeExtensions {
+  ".js": (m: NodeModule, filename: string) => any;
+  ".json": (m: NodeModule, filename: string) => any;
+  ".node": (m: NodeModule, filename: string) => any;
+  [ext: string]: (m: NodeModule, filename: string) => any;
+}
+
+declare let require: NodeRequire;
+
+interface NodeModule {
+  exports: any;
+  require: NodeRequireFunction;
+  id: string;
+  filename: string;
+  loaded: boolean;
+  parent: NodeModule | null;
+  children: NodeModule[];
+  /**
+   * @since 11.14.0
+   *
+   * The directory name of the module. This is usually the same as the path.dirname() of the module.id.
+   */
+  path: string;
+  paths: string[];
+}
+
+declare let module: NodeModule;
+
+// Same as module.exports
+declare let exports: any;

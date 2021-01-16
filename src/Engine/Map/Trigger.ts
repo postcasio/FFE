@@ -10,8 +10,6 @@ export class Trigger {
   constructor(slice: Slice) {
     this.offset = slice.offset;
 
-    SSj.log(slice.data);
-
     this.x = slice.data[0];
     this.y = slice.data[1];
     this.eventPointer =

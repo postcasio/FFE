@@ -15,6 +15,26 @@ export class MapProperties {
     this.view = new DataView(slice.data.buffer);
   }
 
+  json() {
+    return {
+      mapNameIndex: this.mapNameIndex,
+      graphicset1Index: this.graphicset1Index,
+      graphicset2Index: this.graphicset2Index,
+      graphicset3Index: this.graphicset3Index,
+      graphicset4Index: this.graphicset4Index,
+      animatedTilesetIndex: this.animatedTilesetIndex,
+      layer1: this.layer1,
+      layer2: this.layer2,
+      layer3: this.layer3,
+      paletteIndex: this.paletteIndex,
+      mapParallaxIndex: this.mapParallaxIndex,
+      paletteAnimationIndex: this.paletteAnimationIndex,
+      colorMathIndex: this.colorMathIndex,
+      mapWidth: this.mapWidth,
+      mapHeight: this.mapHeight,
+    };
+  }
+
   get mapNameIndex() {
     return this.data[0x00];
   }

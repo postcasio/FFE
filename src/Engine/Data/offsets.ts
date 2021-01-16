@@ -94,3 +94,20 @@ export const ROM_COLOR_MATH_SIZE = 3;
 
 export const ROM_OFFSET_MAP_TRIGGER_POINTER_LIST = hirom(0xc40000);
 export const ROM_OFFSET_MAP_TRIGGERS = hirom(0xc40000);
+
+export const ROM_OFFSET_SPRITE_ANIM_VEHICLE_MOVEMENT = hirom(0xc0580d);
+export const ROM_OFFSET_SPRITE_ANIM_CHARACTER_MOVEMENT = hirom(0xc0581d);
+export const ROM_OFFSET_SPRITE_ANIM_CHARACTER_STANDING = hirom(0xc0582d);
+export const ROM_OFFSET_SPRITE_ANIM_SPECIAL = hirom(0xc0582d);
+
+export const ROM_OFFSET_MAP_TILE_PROPERTIES_POINTER_LIST = hirom(0xd9cd10);
+export const ROM_OFFSET_MAP_TILE_PROPERTIES = hirom(0xd9a800);
+
+export const ROM_OFFSET_DIALOG_PAGE_INDEX = hirom(0xcce600);
+
+export const ROM_OFFSET_SINGLE_TILE_EXIT_POINTER_LIST = hirom(0xdfbb00);
+export const ROM_OFFSET_MULTI_TILE_EXIT_POINTER_LIST = hirom(0xedf480);
+export const ROM_OFFSET_CHARACTER_NAMES = hirom(0xc478c0);
+
+export const ROM_OFFSET_FIXED_WIDTH_FONT_GRAPHICS = hirom(0xc487c0);
+export const ROM_FIXED_WIDTH_FONT_GRAPHICS_SIZE = 0x800;

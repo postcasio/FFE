@@ -1,3 +1,4 @@
+import { Game } from "@/src/Engine/Game";
 import { hex } from "@/src/Engine/utils";
 import { EventInstructionHandlerArguments } from "../EventInstructionSet";
 
@@ -20,7 +21,9 @@ export function instr_Cx_cbr({
 
   const conditionCount = (instruction & 0x7) + 1;
   const conditionOperator =
-    (instruction & 0x8) !== 0 ? ConditionOperator.Or : ConditionOperator.And;
+    (instruction & 0x8) !== 0 || instruction === 0xc0 || instruction === 0xc8
+      ? ConditionOperator.And
+      : ConditionOperator.Or;
 
   const conditionDisasm = [];
   const conditions = [];
@@ -35,7 +38,10 @@ export function instr_Cx_cbr({
     }
 
     conditionDisasm.push(
-      `${type === ConditionType.Clear ? "!" : ""}e$${hex(condition, 3)}`
+      `${type === ConditionType.Clear ? "!" : ""}e$${hex(
+        condition,
+        3
+      )}:${+Game.current.journal.getEventBit(condition)}`
     );
     conditions.push({ condition, type });
   }
@@ -49,17 +55,20 @@ export function instr_Cx_cbr({
     )}) $${hex(offset, 6)}`
   );
 
-  const shouldBranch = conditions.reduce((result, condition) => {
-    let bit = game.journal.getEventBit(condition.condition);
+  const shouldBranch = conditions.reduce(
+    (result, condition) => {
+      let bit = game.journal.getEventBit(condition.condition);
 
-    if (condition.type === ConditionType.Clear) {
-      bit = !bit;
-    }
+      if (condition.type === ConditionType.Clear) {
+        bit = !bit;
+      }
 
-    return conditionOperator === ConditionOperator.And
-      ? result && bit
-      : result || bit;
-  }, true);
+      return conditionOperator === ConditionOperator.And
+        ? result && bit
+        : result || bit;
+    },
+    conditionOperator === ConditionOperator.And ? true : false
+  );
 
   if (shouldBranch) {
     context.jump(offset);

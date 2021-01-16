@@ -9,7 +9,6 @@ export class InstructionStream {
 
   constructor(rom: ROM, offset: number) {
     this.rom = rom;
-    SSj.log(`Creating instruction stream at ${hex(offset, 6)}`);
     this.offset = offset;
   }
 

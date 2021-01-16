@@ -22,6 +22,17 @@ export enum ZLevel {
   snes3P = 17, // snes layer 3, highest priority
   top = 100, // force to top
 }
+
+interface TileAreaModification {
+  type: "tile-area";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+type Modification = TileAreaModification;
+
 export class BG12Layer implements Layer {
   type = LayerType.BG12;
 
@@ -69,6 +80,20 @@ export class BG12Layer implements Layer {
   wavyEffect = false;
 
   layer3Priority = false;
+
+  pendingModifications: Modification[] = [];
+
+  utilShape: Shape = new Shape(
+    ShapeType.TriStrip,
+    null,
+    new VertexList([
+      { x: 0, y: 0, u: 0, v: 1, color: Color.Transparent },
+      { x: 1, y: 0, u: 1, v: 1, color: Color.Transparent },
+      { x: 0, y: 1, u: 0, v: 0, color: Color.Transparent },
+      { x: 1, y: 1, u: 1, v: 0, color: Color.Transparent },
+    ])
+  );
+  utilModel: Model = new Model([this.utilShape]);
 
   makeShapes() {
     const w = this.lowSurface.width;
@@ -130,6 +155,8 @@ export class BG12Layer implements Layer {
         pixelHeight,
         Color.Transparent
       );
+
+      this.makeShapes();
     }
 
     this.lowSurface.blendOp = BlendOp.Replace;
@@ -154,9 +181,41 @@ export class BG12Layer implements Layer {
       }
     }
 
-    this.makeShapes();
-
     this.dirty = false;
+  }
+
+  renderArea(x: number, y: number, w: number, h: number) {
+    if (!this.tileset) {
+      return;
+    }
+
+    this.utilModel.transform
+      .identity()
+      .scale(w * this.tileWidth, h * this.tileHeight)
+      .translate(x * this.tileWidth, y * this.tileHeight);
+    this.utilModel.draw(this.lowSurface);
+    this.utilModel.draw(this.highSurface);
+
+    for (let tileY = y; tileY < y + h; tileY++) {
+      for (let tileX = x; tileX < x + w; tileX++) {
+        if (tileY * this.width + tileX >= this.tiles.length) {
+          break;
+        }
+
+        const tile = this.tiles[tileY * this.width + tileX];
+
+        const pixelX = tileX * this.tileWidth;
+        const pixelY = tileY * this.tileHeight;
+
+        this.tileset.drawTile(
+          this.layer3Priority ? this.highSurface : this.lowSurface,
+          this.highSurface,
+          tile,
+          pixelX,
+          pixelY
+        );
+      }
+    }
   }
 
   private draw(
@@ -210,14 +269,14 @@ export class BG12Layer implements Layer {
 
       this.scrollPositionX = Math.round(this.fineScrollPositionX);
     } else {
-      this.fineScrollPositionX = this.scrollPositionX;
+      this.fineScrollPositionX = this.scrollPositionX = 0;
     }
     if (this.parallaxSpeedY) {
       this.fineScrollPositionY =
         (this.fineScrollPositionY + this.parallaxSpeedY / 60) % this.height;
       this.scrollPositionY = Math.round(this.fineScrollPositionY);
     } else {
-      this.fineScrollPositionY = this.scrollPositionY;
+      this.fineScrollPositionY = this.scrollPositionY = 0;
     }
   }
 
@@ -298,5 +357,74 @@ export class BG12Layer implements Layer {
       fragmentFile: "@/assets/shaders/palettegfx/palettegfx.frag",
       vertexFile: "@/assets/shaders/palettegfx/palettegfx.vert",
     });
+  }
+
+  getTileAt(x: number, y: number) {
+    return this.tiles[x + y * this.width];
+  }
+
+  setTile(x: number, y: number, tile: number) {
+    if (!this.tileset) {
+      return;
+    }
+    const index = x + y * this.width;
+    if (index >= this.tiles.length) {
+      return;
+    }
+    this.tiles[index] = tile;
+  }
+
+  getOffset(
+    cameraX: number,
+    cameraY: number,
+    targetW: number,
+    targetH: number
+  ) {
+    const xOffset =
+      cameraX / this.parallaxMultiplierX +
+      this.scrollPositionX +
+      this.shiftX * 16 -
+      targetW / 2 +
+      8;
+    const yOffset =
+      cameraY / this.parallaxMultiplierY +
+      this.scrollPositionY +
+      this.shiftY * 16 -
+      targetH / 2;
+
+    return [xOffset, yOffset];
+  }
+
+  applyPendingModifications() {
+    for (const mod of this.pendingModifications) {
+      switch (mod.type) {
+        case "tile-area":
+          this.renderArea(mod.x, mod.y, mod.w, mod.h);
+          break;
+      }
+    }
+
+    this.pendingModifications = [];
+  }
+
+  setArea(x: number, y: number, w: number, h: number, data: number[]) {
+    for (let i = 0; i < data.length; i++) {
+      const tx = x + (i % w);
+      const ty = y + Math.floor(i / w);
+
+      this.setTile(tx, ty, data[i]);
+    }
+
+    this.pendingModifications.push({
+      type: "tile-area",
+      x,
+      y,
+      w,
+      h,
+    });
+  }
+
+  positionToTile(x: number, y: number) {
+    return [Math.floor(x / 16), Math.floor(y / 16)];
   }
 }

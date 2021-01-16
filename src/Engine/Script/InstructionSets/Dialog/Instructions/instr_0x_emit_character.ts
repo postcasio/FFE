@@ -1,3 +1,4 @@
+import { Game } from "@/src/Engine/Game";
 import { DialogInstructionHandlerArguments } from "../DialogInstructionSet";
 
 export function instr_0x_emit_character({
@@ -10,7 +11,10 @@ export function instr_0x_emit_character({
 
   context.disasm("emit", `@character(#$${character})`);
 
-  emit(0x39);
-  emit(0x39);
-  emit(0x39);
+  for (const c of Game.current.journal
+    .getCharacter(character)
+    .getName()
+    .split("")) {
+    emit(Game.current.rom.tables.primary.encode(c));
+  }
 }

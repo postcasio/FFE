@@ -17,8 +17,15 @@ export class ScriptEngine {
     } catch (e) {
       SSj.log("Script engine failed");
       SSj.log(e.toString());
-
+      throw e;
       this.currentScript = undefined;
     }
+  }
+
+  run(offset: number) {
+    if (this.currentScript && !this.currentScript.isFinished()) {
+      throw "already had a script";
+    }
+    this.currentScript = Game.current.createScriptContext(offset);
   }
 }

@@ -1,3 +1,4 @@
+import { Game } from "@/src/Engine/Game";
 import { hex } from "@/src/Engine/utils";
 import { RidingType } from "../../../RidingType";
 import { EventInstructionHandlerArguments } from "../EventInstructionSet";
@@ -19,4 +20,6 @@ export function instr_44_set_object_riding({
       showRider ? "" : " @hide"
     }`
   );
+
+  Game.current.mapEngine.getObject(object)?.setRiding(riding, showRider);
 }

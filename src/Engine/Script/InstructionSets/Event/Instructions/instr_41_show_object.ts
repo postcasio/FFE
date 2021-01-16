@@ -6,10 +6,12 @@ export function instr_41_show_object({
   context,
   game,
 }: EventInstructionHandlerArguments) {
-  const instr = stream.next8();
+  stream.next8();
   const object = stream.next8();
 
   context.disasm("show_object", `#$${hex(object, 2)}`);
 
-  game.mapEngine.objects[object].visible = true;
+  SSj.log(`Showing object ${game.mapEngine.getObject(object)?.index}`);
+
+  game.mapEngine.getObject(object)?.setVisible(true);
 }

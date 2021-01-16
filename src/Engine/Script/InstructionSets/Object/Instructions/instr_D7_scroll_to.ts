@@ -11,6 +11,5 @@ export function instr_D7_scroll_to({
 
   context.disasm("scroll_to", "");
 
-  game.mapEngine.objects[OBJECT_ID_CAMERA].x = object.x;
-  game.mapEngine.objects[OBJECT_ID_CAMERA].y = object.y;
+  game.mapEngine.getCamera().setPosition(object.x, object.y);
 }

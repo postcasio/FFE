@@ -14,13 +14,38 @@ export class Window {
 
   cache: Map<string, Surface> = new Map();
 
+  shape: Shape;
+  model?: Model;
+
   constructor(graphics: Graphics, paletteSet: PaletteSet) {
     this.graphics = graphics;
     this.paletteSet = paletteSet;
+    this.shape = new Shape(
+      ShapeType.TriStrip,
+      null,
+      new VertexList([
+        { x: 0, y: 0, u: 0, v: 1 },
+        { x: 1, y: 0, u: 1, v: 1 },
+        { x: 0, y: 1, u: 0, v: 0 },
+        { x: 1, y: 1, u: 1, v: 0 },
+      ])
+    );
+  }
+
+  async initialize() {
+    this.model = new Model(
+      [this.shape],
+      await Shader.fromFiles({
+        fragmentFile: "@/assets/shaders/window/window.frag",
+        vertexFile: "@/assets/shaders/window/window.vert",
+      })
+    );
   }
 
   static async create(graphics: Graphics, paletteSet: PaletteSet) {
     const window = new Window(graphics, paletteSet);
+
+    await window.initialize();
 
     return window;
   }
@@ -45,18 +70,42 @@ export class Window {
     x: number,
     y: number,
     widthInTiles: number,
-    heightInTiles: number
+    heightInTiles: number,
+    gradientUsesWindowHeight = false,
+    smoothGradient = false
   ) {
-    const key = `${x},${y},${widthInTiles},${heightInTiles}`;
+    if (!this.model) {
+      return;
+    }
+
+    const width = widthInTiles * 8;
+    const height = heightInTiles * 8;
+
+    const shader = this.model.shader!;
+
+    shader.setBoolean("smooth_gradient", smoothGradient);
+    shader.setBoolean("gradient_uses_window_height", gradientUsesWindowHeight);
+    shader.setFloat("window_height", height);
+    shader.setFloat("screen_height", target.height);
+    shader.setFloat("segments", gradientUsesWindowHeight ? 13 : 32);
+    shader.setFloat("top", 0.3);
+    shader.setFloat("bottom", -0.3);
+
+    const key = `${x},${y},${widthInTiles},${heightInTiles},${
+      smoothGradient ? 1 : 0
+    }`;
 
     let cache = this.cache.get(key);
 
     if (cache) {
-      Prim.blit(target, x, y, cache);
+      this.shape.texture = cache;
+      this.model.transform.identity().scale(width, height).translate(x, y);
+      this.model.draw(target);
+
       return;
     }
 
-    cache = new Surface(widthInTiles * 8, heightInTiles * 8, Color.Transparent);
+    cache = new Surface(width, height, Color.Transparent);
 
     let ty = 0;
 
@@ -96,6 +145,8 @@ export class Window {
 
     this.cache.set(key, cache);
 
-    Prim.blit(target, 0, 0, cache);
+    this.shape.texture = cache;
+    this.model.transform.identity().scale(width, height).translate(x, y);
+    this.model.draw(target);
   }
 }

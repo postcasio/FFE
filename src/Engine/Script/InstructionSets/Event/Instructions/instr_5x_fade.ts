@@ -7,8 +7,22 @@ export function instr_5x_fade({
   game,
 }: EventInstructionHandlerArguments) {
   const instr = stream.next8();
-  const speed = stream.next8();
-  const opt = instr === 0x59 ? "@in" : "@out";
+  let speed = 0;
+  let opt = "?";
+
+  switch (instr) {
+    case 0x59:
+    case 0x5a:
+      speed = stream.next8();
+      opt = instr === 0x59 ? "@in" : "@out";
+
+      break;
+    case 0x97:
+      speed = 16;
+      opt = "@out";
+
+      break;
+  }
 
   context.disasm("fade", `${opt} #${speed}`);
 

@@ -1,11 +1,16 @@
 import Tween, { Easing } from "tween";
-import { ROM_OFFSET_DIALOG_POINTER_LIST } from "./Data/offsets";
+import {
+  ROM_OFFSET_DIALOG,
+  ROM_OFFSET_DIALOG_PAGE_INDEX,
+  ROM_OFFSET_DIALOG_POINTER_LIST,
+} from "./Data/offsets";
 import { Game } from "./Game";
 import { InputMapping } from "./Input/InputMapping";
 import { Intent } from "./Input/Intent";
 import { DialogScriptContext } from "./Script/InstructionSets/Dialog/DialogInstructionSet";
 import { ScriptContext } from "./Script/ScriptContext";
 import { TextWrap } from "./TextWrap";
+import { hex } from "./utils";
 
 const bg = new Color(0.3, 0.3, 0.6, 0.8);
 
@@ -33,6 +38,11 @@ export enum State {
   Finished,
 }
 
+interface Choice {
+  line: number;
+  index: number;
+}
+
 export class MessageBox {
   game: Game;
   state: State = State.Closed;
@@ -54,23 +64,43 @@ export class MessageBox {
   callbacksOnDidFinish: Array<() => void> = [];
   callbacksOnDidEmit: Array<() => void> = [];
 
+  pageIndex: number;
+
+  choices: Choice[] = [];
+
   constructor(game: Game) {
     this.game = game;
 
     this.text = new TextWrap(this.game.variableWidthFont, 256 - 40);
+    this.pageIndex = this.game.rom.getUint16(ROM_OFFSET_DIALOG_PAGE_INDEX);
   }
 
   loadDialog(index: number, parentContext: ScriptContext) {
-    const pointer = this.game.rom.getUint16(
+    SSj.log(
+      `Loading dialog ${index} pointer at ${hex(
+        ROM_OFFSET_DIALOG_POINTER_LIST + index * 2,
+        6
+      )}`
+    );
+    let pointer = this.game.rom.getUint16(
       ROM_OFFSET_DIALOG_POINTER_LIST + index * 2
     );
 
-    this.stop(true);
+    if (index > this.pageIndex) {
+      pointer += 0x10000;
+    }
+
+    SSj.log(`final offset = ${hex(ROM_OFFSET_DIALOG + pointer, 6)}`);
+
+    if (this.isOpen()) {
+      this.stop(true);
+    }
 
     this.dialogScriptContext = this.game.createDialogScriptContext(
       pointer,
       parentContext
     );
+
     this.state = State.Writing;
   }
 
@@ -116,7 +146,7 @@ export class MessageBox {
           : target.height - height - top;
 
       if (!this.transparent) {
-        Game.current.window.draw(target, left, y, 30, 9);
+        Game.current.window.draw(target, left, y, 30, 9, true, false);
       }
 
       target.clipTo(left + paddingX, y + paddingY, textWidth, textHeight + 1);

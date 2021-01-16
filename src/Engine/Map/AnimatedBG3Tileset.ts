@@ -42,7 +42,6 @@ export class AnimatedBG3Tileset {
         ],
       });
     }
-    SSj.log(this.tiles);
   }
 
   drawTile(

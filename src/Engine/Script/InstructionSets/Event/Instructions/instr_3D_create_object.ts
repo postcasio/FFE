@@ -6,10 +6,10 @@ export function instr_3D_create_object({
   context,
   game,
 }: EventInstructionHandlerArguments) {
-  const instruction = stream.next8();
-  const object = stream.next8();
+  stream.next8();
+  const objectIndex = stream.next8();
 
-  context.disasm("create_object", "#$" + hex(object, 2));
+  context.disasm("create_object", "#$" + hex(objectIndex, 2));
 
-  game.mapEngine.objects[object].exists = true;
+  game.mapEngine.getObject(objectIndex)?.setExists(true);
 }

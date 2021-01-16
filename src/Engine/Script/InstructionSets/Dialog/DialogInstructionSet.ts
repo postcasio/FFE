@@ -14,8 +14,10 @@ import { instr_11_pause } from "./Instructions/instr_11_pause";
 import { instr_12_pause } from "./Instructions/instr_12_pause";
 import { instr_13_page } from "./Instructions/instr_13_page";
 import { instr_14_emit_spaces } from "./Instructions/instr_14_emit_spaces";
+import { instr_15_choice } from "./Instructions/instr_15_choice";
 import { instr_16_pause } from "./Instructions/instr_16_pause";
 import { instr_xx_emit_raw } from "./Instructions/instr_xx_emit_raw";
+import { instr_19_gp } from "./Instructions/instr_19_gp";
 
 export type DialogInstructionHandlerArguments = InstructionHandlerPayload<
   DialogInstructionSet,
@@ -62,7 +64,9 @@ dialogInstructions.set(0x12, instr_12_pause);
 dialogInstructions.set(0x13, instr_13_page);
 
 dialogInstructions.set(0x14, instr_14_emit_spaces);
+dialogInstructions.set(0x15, instr_15_choice);
 dialogInstructions.set(0x16, instr_16_pause);
+dialogInstructions.set(0x19, instr_19_gp);
 
 for (let i = 0x20; i <= 0xff; i++) {
   dialogInstructions.set(i, instr_xx_emit_raw);

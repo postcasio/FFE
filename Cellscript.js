@@ -22,7 +22,7 @@ Object.assign(Sphere.Game, {
   name: "ffe",
   author: "casiotone",
   summary: "",
-  resolution: "800x600",
+  resolution: "1920x1080",
 
   saveID: "ffe",
 
@@ -47,3 +47,5 @@ Object.assign(Sphere.Game, {
 install("@/assets", files("assets/*", true));
 
 tsc("@/", "tsconfig.json");
+
+install("@/lib/parse-bmfont-ascii", files("node_modules/parse-bmfont-ascii/*"));

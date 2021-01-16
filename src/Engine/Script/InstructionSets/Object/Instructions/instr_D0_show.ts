@@ -9,5 +9,5 @@ export function instr_D0_show({
 
   context.disasm("show", "");
 
-  object.visible = true;
+  object.setVisible(true);
 }

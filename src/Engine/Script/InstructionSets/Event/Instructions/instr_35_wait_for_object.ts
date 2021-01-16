@@ -6,10 +6,10 @@ export function instr_35_wait_for_object({
   context,
   game,
 }: EventInstructionHandlerArguments) {
-  const instruction = stream.next8();
+  stream.next8();
   const object = stream.next8();
 
   context.disasm("wait_for_object", "#$" + hex(object, 2));
 
-  context.waitForObject(game.mapEngine.objects[object]);
+  context.waitForObject(game.mapEngine.getObject(object)!);
 }

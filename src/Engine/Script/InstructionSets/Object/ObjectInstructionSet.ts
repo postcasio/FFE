@@ -11,14 +11,17 @@ import { ScriptContext } from "../../ScriptContext";
 import { instr_8x_9x_move } from "./Instructions/instr_8x_9x_move";
 import { instr_Cx_set_direction } from "./Instructions/instr_Cx_set_direction";
 import { instr_Cx_set_speed } from "./Instructions/instr_Cx_set_speed";
+import { instr_Cx_set_walk } from "./Instructions/instr_Cx_set_walk";
 import { instr_D0_show } from "./Instructions/instr_D0_show";
 import { instr_D1_hide } from "./Instructions/instr_D1_hide";
 import { instr_D5_set_position } from "./Instructions/instr_D5_set_position";
 import { instr_D7_scroll_to } from "./Instructions/instr_D7_scroll_to";
+import { instr_Dx_jump } from "./Instructions/instr_Dx_jump";
 import { instr_E0_pause } from "./Instructions/instr_E0_pause";
 import { instr_FC_bra } from "./Instructions/instr_FC_bra";
 import { instr_FF_end } from "./Instructions/instr_FF_end";
 import { instr_xx_action } from "./Instructions/instr_xx_action";
+import { instr_C8_set_priority } from "./Instructions/instr_C8_set_priority";
 
 export type ObjectInstructionHandlerArguments = InstructionHandlerPayload<
   ObjectInstructionSet,
@@ -52,7 +55,7 @@ const objectInstructions: Map<
   InstructionHandler | undefined
 > = new Map();
 
-for (let i = 0x00; i <= 0x37; i++) {
+for (let i = 0x00; i <= 0x7f; i++) {
   objectInstructions.set(i, instr_xx_action);
 }
 
@@ -68,6 +71,10 @@ for (let i = 0xc0; i <= 0xc5; i++) {
   objectInstructions.set(i, instr_Cx_set_speed);
 }
 
+objectInstructions.set(0xc6, instr_Cx_set_walk);
+objectInstructions.set(0xc7, instr_Cx_set_walk);
+objectInstructions.set(0xc8, instr_C8_set_priority);
+
 for (let i = 0xcc; i <= 0xcf; i++) {
   objectInstructions.set(i, instr_Cx_set_direction);
 }
@@ -76,6 +83,8 @@ objectInstructions.set(0xd0, instr_D0_show);
 objectInstructions.set(0xd1, instr_D1_hide);
 objectInstructions.set(0xd5, instr_D5_set_position);
 objectInstructions.set(0xd7, instr_D7_scroll_to);
+objectInstructions.set(0xdc, instr_Dx_jump);
+objectInstructions.set(0xdd, instr_Dx_jump);
 objectInstructions.set(0xe0, instr_E0_pause);
 
 objectInstructions.set(0xfc, instr_FC_bra);

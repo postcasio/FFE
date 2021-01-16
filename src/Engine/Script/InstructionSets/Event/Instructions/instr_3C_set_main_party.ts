@@ -6,7 +6,7 @@ export function instr_3C_set_active_party_members({
   context,
   game,
 }: EventInstructionHandlerArguments) {
-  const instruction = stream.next8();
+  stream.next8();
 
   const chars = [
     stream.next8(),
@@ -20,5 +20,5 @@ export function instr_3C_set_active_party_members({
     chars.map((char) => "#$" + hex(char, 2)).join(", ")
   );
 
-  game.journal.setPartyMembers(chars as [number, number, number, number]);
+  game.journal.setPartyMembers(chars.filter((c) => c != 0xff));
 }

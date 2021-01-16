@@ -26,7 +26,7 @@ export function instr_xx_object_script({
     count
   );
 
-  const object = game.mapEngine.objects[index];
+  const object = game.mapEngine.getObject(index)!;
 
   object.loadObjectScript(Game.current.createObjectScriptContext(ip, object));
 
