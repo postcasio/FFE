@@ -56,7 +56,7 @@ export default class FFE extends Thread {
 
     game.mapEngine.loadMap(50);
     game.mapEngine.cameraLocked = false;
-    game.journal.setPartyMembers([0x00]);
+    game.journal.setPartyMembers([0x00, 0x01]);
     const object = game.mapEngine.getObject(OBJECT_ID_PARTY1)!;
     object.zLevel = ZLevel.Lower;
     object.exists = true;
@@ -70,6 +70,8 @@ export default class FFE extends Thread {
     game.mapEngine.updateCamera(true);
     game.mapEngine.refreshObjects();
     game.fader.fade(FadingDirection.In, 2);
+
+    game.scriptEngine.run(0x02a92d);
 
     Dispatch.onRender(() => {
       game.render();

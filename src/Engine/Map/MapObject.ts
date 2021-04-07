@@ -435,6 +435,10 @@ export class MapObject {
           this.movingToY = undefined;
           this.movingTiles--;
 
+          if (this.isPlayerControlled()) {
+            Game.current.journal.setCurrentPartyXY(this.x, this.y);
+          }
+
           if (!this.movingTiles) {
             this.dirty = true;
 
@@ -679,5 +683,9 @@ export class MapObject {
   setExists(exists: boolean) {
     this.exists = exists;
     this.dirty = true;
+  }
+
+  setEventAddress(event: number) {
+    this.eventAddress = event;
   }
 }

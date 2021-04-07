@@ -55,14 +55,14 @@ export class FixedWidthFont {
     character: number,
     mask?: Color
   ) {
-    if (character < 0x20) {
-      return;
-    }
+    // if (character < 0x20) {
+    //   return;
+    // }
 
     this.mask = Color.Black;
     this.graphics.drawTile(
       surface,
-      character - 0x20,
+      character,
       x + 1,
       y + 1,
       this.paletteSet,

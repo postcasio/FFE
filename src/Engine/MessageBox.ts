@@ -67,6 +67,10 @@ export class MessageBox {
   pageIndex: number;
 
   choices: Choice[] = [];
+  selectedChoiceIndex = 0;
+
+  lastSelectedChoice = 0;
+  lastChoiceCount = 0;
 
   constructor(game: Game) {
     this.game = game;
@@ -101,6 +105,9 @@ export class MessageBox {
       parentContext
     );
 
+    this.choices = [];
+    this.selectedChoiceIndex = 0;
+
     this.state = State.Writing;
   }
 
@@ -116,10 +123,37 @@ export class MessageBox {
 
   acceptInput(input: InputMapping) {
     switch (input.intent) {
+      case Intent.CursorUp:
+        if (this.choices.length && this.selectedChoiceIndex > 0) {
+          this.selectedChoiceIndex--;
+        }
+        break;
+      case Intent.CursorDown:
+        if (
+          this.choices.length &&
+          this.selectedChoiceIndex < this.choices.length - 1
+        ) {
+          this.selectedChoiceIndex++;
+        }
+        break;
       case Intent.Accept:
         if (this.state === State.Finished) {
+          if (this.choices.length) {
+            SSj.log(
+              `Selected choice: ${this.choices[this.selectedChoiceIndex]}`
+            );
+            this.lastSelectedChoice = this.selectedChoiceIndex;
+            this.lastChoiceCount = this.choices.length;
+          }
           this.close();
         } else if (this.state === State.WaitingPage) {
+          if (this.choices.length) {
+            SSj.log(
+              `Selected choice: ${this.choices[this.selectedChoiceIndex]}`
+            );
+            this.lastSelectedChoice = this.selectedChoiceIndex;
+            this.lastChoiceCount = this.choices.length;
+          }
           // We were waiting to page
           this.page();
         } else if (this.state === State.Writing && this.keypressPromise) {
@@ -158,6 +192,17 @@ export class MessageBox {
       );
 
       target.clipTo(0, 0, target.width, target.height);
+
+      if (this.choices.length) {
+        const choice = this.choices[this.selectedChoiceIndex];
+
+        Game.current.variableWidthFont.drawCharacter(
+          target,
+          left + paddingX,
+          y + paddingY - 1 + choice.line * 15,
+          0xc0
+        );
+      }
     }
   }
 
@@ -221,6 +266,8 @@ export class MessageBox {
   page(): Promise<void> {
     this.autoPageOnce = false;
     this.state = State.Paging;
+    this.choices = [];
+    this.selectedChoiceIndex = 0;
 
     return new Tween(this as MessageBox, Easing.Linear)
       .easeIn(
@@ -251,5 +298,12 @@ export class MessageBox {
         this.callbacksOnDidEmit = [];
       });
     }
+  }
+
+  markChoice() {
+    this.choices.push({
+      index: this.choices.length,
+      line: this.text.lines.length - 1,
+    });
   }
 }

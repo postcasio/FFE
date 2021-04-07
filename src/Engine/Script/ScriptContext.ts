@@ -169,16 +169,21 @@ export class ScriptContext<
     }
   }
 
-  waitForMessageBox() {
+  waitForMessageBox(): Promise<void> {
     if (this.game.messageBox.isOpen()) {
-      this.state = ScriptContextState.Waiting;
+      return new Promise((res, rej) => {
+        this.state = ScriptContextState.Waiting;
 
-      this.game.messageBox.onDidFinish(() => {
-        if (this.state === ScriptContextState.Waiting) {
-          this.state = ScriptContextState.Executing;
-        }
+        this.game.messageBox.onDidFinish(() => {
+          if (this.state === ScriptContextState.Waiting) {
+            this.state = ScriptContextState.Executing;
+            res();
+          }
+        });
       });
     }
+
+    return Promise.resolve();
   }
 
   waitForMessageBoxEmit(): Promise<void> {

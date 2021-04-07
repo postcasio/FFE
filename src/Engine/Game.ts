@@ -1,4 +1,4 @@
-import { ROM } from "./Data/ROM";
+import { ROM, Slice } from "./Data/ROM";
 import { Fader } from "./Fader";
 import { Journal } from "./Journal";
 import { MapEngine } from "./Map/MapEngine";
@@ -25,6 +25,8 @@ import { Intent } from "./Input/Intent";
 import { SpriteAnimationType } from "./Map/Sprite";
 import { Debugger } from "./Debugger/Debugger";
 import { FixedWidthFont } from "./Fonts/FixedWidthFont";
+import { hirom } from "./Data/offsets";
+import { ByteSwap } from "./Data/ByteSwap";
 
 export class Game {
   static rom: ROM;
@@ -44,8 +46,10 @@ export class Game {
   window!: Window;
   inputManager: InputManager;
   debugger: Debugger;
-  disasmPrefixes = ["OBJ", "EVT"]; // EVT, MSG, OBJ
+  disasmPrefixes = ["OBJ", "EVT", "MSG"]; // EVT, MSG, OBJ
   paused = false;
+  cursorGraphics: Graphics;
+  cursorPaletteSet: PaletteSet;
 
   constructor(rom: ROM) {
     Game.current = this;
@@ -76,6 +80,14 @@ export class Game {
     this.inputManager = new InputManager();
 
     initializeDefaultMappings(this.inputManager);
+
+    this.cursorPaletteSet = new PaletteSet(rom.getMenuPaletteSetSlice(), 4);
+    this.cursorGraphics = new Graphics(
+      rom.getCursorGraphicsSlice(),
+      GraphicsFormat.Snes4bpp,
+      8,
+      8
+    );
   }
 
   async init() {
@@ -94,8 +106,22 @@ export class Game {
       new PaletteSet(Game.rom.getMessagePaletteSetSlice(), 16)
     );
 
+    const vwfSlice = Game.rom.getVariableWidthFontGraphicsSlice();
+    const cpSlice = Game.rom.getChoicePointerGraphicsSlice();
+
+    const combinedBuffer = new Uint8Array(vwfSlice.data.length + 22);
+    combinedBuffer.set(vwfSlice.data, 0);
+    combinedBuffer.set(
+      Array.from(cpSlice.data).reduce((p, v) => {
+        p.push(0, v);
+        return p;
+      }, [] as number[]),
+      vwfSlice.data.length
+    );
+    SSj.log(vwfSlice.data.length);
+
     const vwfGraphics = new Graphics(
-      Game.rom.getVariableWidthFontGraphicsSlice(),
+      new Slice(vwfSlice.offset, combinedBuffer),
       GraphicsFormat.ByteSwappedLinear1bpp,
       16,
       11
@@ -139,6 +165,7 @@ export class Game {
     //this.renderPaletteDebug();
     //this.renderSpriteDebug();
     this.debugger.render();
+
     this.screenShape.draw(Surface.Screen, this.screenTransform);
   }
 
@@ -225,6 +252,8 @@ export class Game {
     switch (input.intent) {
       case Intent.Accept:
       case Intent.HurryMessage:
+      case Intent.CursorDown:
+      case Intent.CursorUp:
         if (this.messageBox.isOpen()) {
           this.messageBox.acceptInput(input);
         } else if (this.playerCanMove()) {

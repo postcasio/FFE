@@ -12,7 +12,12 @@ export async function instr_4D_battle({
   const enemySet = stream.next8();
   const background = stream.next8();
 
-  context.disasm("battle", `#$${hex(enemySet, 2)} #$${hex(background, 2)}`);
+  context.disasm(
+    "battle",
+    `#$${hex(enemySet, 2)} #$${hex(background, 2)}${
+      instruction === 0x4c ? " @collision" : ""
+    }`
+  );
 
   Sphere.sleep(30).then(() => {
     Game.current.fader.fade(FadingDirection.Out, 9);

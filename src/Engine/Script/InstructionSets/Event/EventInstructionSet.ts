@@ -74,6 +74,11 @@ import { instr_8B_set_char_hp_mp } from "./Instructions/instr_8B_set_char_hp_mp"
 import { instr_61_colorize_screen } from "./Instructions/instr_61_colorize_screen";
 import { instr_62_mosaic } from "./Instructions/instr_62_mosaic";
 import { instr_49_wait_for_msg } from "./Instructions/instr_49_wait_for_msg";
+import { instr_B6_cbr_msg } from "./Instructions/instr_B6_cbr_msg";
+import { instr_79_set_party_map } from "./Instructions/instr_79_set_party_map";
+import { instr_7A_set_obj_event } from "./Instructions/instr_7A_set_obj_event";
+import instr_82_reset_default_party from "./Instructions/instr_82_reset_default_party";
+import { instr_7B_pop_party } from "./Instructions/instr_7B_pop_party";
 
 export type EventInstructionHandlerArguments = InstructionHandlerPayload<
   EventInstructionSet,
@@ -131,6 +136,7 @@ eventInstructions.set(0x47, instr_47_create_party_object);
 eventInstructions.set(0x48, instr_4x_show_msg);
 eventInstructions.set(0x49, instr_49_wait_for_msg);
 eventInstructions.set(0x4b, instr_4x_show_msg);
+eventInstructions.set(0x4c, instr_4D_battle);
 eventInstructions.set(0x4d, instr_4D_battle);
 eventInstructions.set(0x50, instr_50_tint_screen);
 eventInstructions.set(0x54, instr_unk_1);
@@ -152,10 +158,14 @@ eventInstructions.set(0x73, instr_73_update_map_data);
 eventInstructions.set(0x74, instr_73_update_map_data);
 eventInstructions.set(0x75, instr_75_refresh_map);
 eventInstructions.set(0x78, instr_78_enable_passability);
+eventInstructions.set(0x79, instr_79_set_party_map);
+eventInstructions.set(0x7a, instr_7A_set_obj_event);
+eventInstructions.set(0x7b, instr_7B_pop_party);
 eventInstructions.set(0x7c, instr_7x_set_obj_collision);
 eventInstructions.set(0x7d, instr_7x_set_obj_collision);
 eventInstructions.set(0x7f, instr_7F_set_char_name);
 eventInstructions.set(0x80, instr_80_give_item);
+eventInstructions.set(0x82, instr_82_reset_default_party);
 eventInstructions.set(0x84, instr_84_give_gp);
 eventInstructions.set(0x85, instr_85_take_gp);
 eventInstructions.set(0x88, instr_8x_set_char_status);
@@ -179,6 +189,7 @@ eventInstructions.set(0xb1, instr_B1_repeat);
 eventInstructions.set(0xb2, instr_B2_jsr);
 eventInstructions.set(0xb4, instr_xx_pause);
 eventInstructions.set(0xb5, instr_xx_pause);
+eventInstructions.set(0xb6, instr_B6_cbr_msg);
 eventInstructions.set(0xb7, instr_B7_cbr_battle);
 eventInstructions.set(0xbe, instr_BE_switch);
 eventInstructions.set(0xde, instr_DE_load_party);

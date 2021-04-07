@@ -4,12 +4,24 @@ import { Game } from "./Game";
 
 export const EVENT_BIT_GO_TO_NARSHE_SCENE_AFTER_MAGITEK = 0x2fe;
 
+interface PartyState {
+  index: number;
+  mapIndex: number;
+  x: number;
+  y: number;
+}
+
 export class Journal {
   eventBits: Uint8Array;
   battleBits: Uint8Array;
   game: Game;
 
+  partyStates: PartyState[] = new Array(16)
+    .fill(0)
+    .map((n, i) => ({ index: i, mapIndex: 0, x: 0, y: 0 }));
+
   currentParty = 1;
+  defaultParty = 1;
 
   get party() {
     return this.characters
@@ -132,5 +144,22 @@ export class Journal {
     }
 
     return party[indexInParty];
+  }
+
+  setPartyMapIndex(party: number, map: number) {
+    this.partyStates[party].mapIndex = map;
+  }
+
+  setCurrentPartyMapIndex(map: number) {
+    this.partyStates[this.currentParty].mapIndex = map;
+  }
+
+  setCurrentPartyXY(x: number, y: number) {
+    this.partyStates[this.currentParty].x = x;
+    this.partyStates[this.currentParty].y = y;
+  }
+
+  setDefaultParty(index: number) {
+    this.defaultParty = index;
   }
 }

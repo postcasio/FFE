@@ -274,6 +274,8 @@ export class MapEngine {
   loadMap(index: number, runScripts = true) {
     this.index = index;
 
+    Game.current.journal.setCurrentPartyMapIndex(index);
+
     if (index === 3) {
       return this.loadEmptyMap();
     }

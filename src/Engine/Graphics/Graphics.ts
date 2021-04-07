@@ -9,6 +9,7 @@ import { PaletteSet } from "./PaletteSet";
 
 export enum GraphicsFormat {
   ByteSwappedLinear1bpp,
+  Linear1bpp,
   Snes4bpp,
   Snes2bpp,
 }
@@ -135,6 +136,9 @@ export class Graphics {
       case GraphicsFormat.ByteSwappedLinear1bpp:
         this.data = this.decodeByteSwappedLinear1bpp(slice.data);
         break;
+      case GraphicsFormat.Linear1bpp:
+        this.data = this.decodeLinear1bpp(slice.data);
+        break;
       case GraphicsFormat.Snes2bpp:
         this.data = this.decodeSnes2bpp(slice.data);
         break;
@@ -162,6 +166,10 @@ export class Graphics {
 
   decodeByteSwappedLinear1bpp(data: Uint8Array): Uint8Array {
     return ByteSwap.decode(Linear1bpp.decode(data), 16);
+  }
+
+  decodeLinear1bpp(data: Uint8Array): Uint8Array {
+    return ByteSwap.decode(Linear1bpp.decode(data), 8);
   }
 
   renderAtlasWithPalette(

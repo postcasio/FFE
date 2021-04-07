@@ -62,6 +62,12 @@ export class MapPropertiesPanel extends Panel<
           ...position,
         }),
       (position: GUIVerticalLayout) =>
+        g.texturePreview({
+          texture: Game.current.cursorPaletteSet.getTexture(),
+          ...position,
+          h: 256,
+        }),
+      (position: GUIVerticalLayout) =>
         g.drawer({
           id: "map_properties",
           title: `Map #${map.index}: ${map.name}`,
@@ -178,7 +184,7 @@ export class MapPropertiesPanel extends Panel<
   getTree = () => {
     const map = this.params.game.mapEngine;
 
-    return [`Map #${map.index}`];
+    return ["Layer 1", "Layer 2", "Layer 3", "Objects", "Triggers"];
   };
 
   getTreeChildren = (item: ObjectTreeItem) => {
@@ -192,7 +198,7 @@ export class MapPropertiesPanel extends Panel<
     }
 
     if (typeof item === "string") {
-      return ["Layer 1", "Layer 2", "Layer 3", "Objects", "Triggers"];
+      return [];
     }
 
     return [];

@@ -20,11 +20,10 @@ export function instr_47_create_party_object({
     const map = Game.current.mapEngine;
     const object = map.getObject(charIndex)!;
     object.setExists(true);
-    object.setVisible(true);
     object.loadPalette(0);
     object.loadSprite(charIndex);
     object.setPosition(player.x, player.y);
-    object.zLevel = player.zLevel;
-    object.render();
+    object.setZLevel(player.zLevel);
+    object.setVisible(true);
   }
 }

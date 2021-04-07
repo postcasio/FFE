@@ -10,7 +10,8 @@ export function instr_15_choice({
 
   context.disasm("choice", "");
 
-  context
-    .waitForMessageBoxEmit()
-    .then(() => Game.current.messageBox.markChoice());
+  context.waitForMessageBoxEmit().then(() => {
+    Game.current.messageBox.markChoice();
+    emit(0x7f);
+  });
 }
